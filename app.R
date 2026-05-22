@@ -1,3 +1,4 @@
+#### Initialization ############################################################
 library(shiny)
 library(dplyr)
 library(DT)
@@ -7,7 +8,19 @@ library(leaflet)
 library(leaflet.extras)
 library(sf)
 library(shinyjs)
+library(terradactyl)
+library(trex)
 source("functions.R")
+
+
+# terradactyl_scripts <- list.files(path = "terradactyl",
+#                                   pattern = "R$")
+# message("Loading terradactyl scripts")
+# for (script in terradactyl_scripts) {
+#   source(paste0("terradactyl/", script))
+# }
+# message("terradactyl scripts loaded")
+# options(shiny.maxRequestSize = 3000 * 1024^2)
 
 # Define UI for application
 ui <- fluidPage(
@@ -194,14 +207,17 @@ ui <- fluidPage(
                  tags$div(id = "fetch_and_busy_container",
                           tags$div(id = "fetch_button_container",
                                    HTML("<center>"),
-                                   uiOutput("fetch_ui1"),
+                                   uiOutput("fetch_ui"),
                                    HTML("</center>"),
-                                   HTML("<center>"),
-                                   uiOutput("fetch_ui2"),
-                                   HTML("</center>"),
-                                   HTML("<center>"),
-                                   uiOutput("fetch_ui3"),
-                                   HTML("</center>"),
+                                   # HTML("<center>"),
+                                   # uiOutput("fetch_ui1"),
+                                   # HTML("</center>"),
+                                   # HTML("<center>"),
+                                   # uiOutput("fetch_ui2"),
+                                   # HTML("</center>"),
+                                   # HTML("<center>"),
+                                   # uiOutput("fetch_ui3"),
+                                   # HTML("</center>"),
                                    uiOutput("data_available_ui")
                           ),
                           conditionalPanel(
@@ -790,9 +806,10 @@ ui <- fluidPage(
 server <- function(input, output, session) {
   ##### Intialization #####
   # Allow for wonking big files
-  options(shiny.maxRequestSize = 30 * 1024^2)
+  options(shiny.maxRequestSize = 3000 * 1024^2)
   
-  # This is dangerous, but I'm doing it anyway so that polygons work consistently
+  # This is slightly dangerous, but I'm doing it anyway so that polygons work
+  # consistently
   sf::sf_use_s2(FALSE)
   
   # Our workspace list for storing stuff
@@ -825,6 +842,7 @@ server <- function(input, output, session) {
                               metadata_lut = NULL,
                               polygons = NULL,
                               default_species_filename = "usda_plants_characteristics_lookup_20210830.csv",
+                              species_list_terradat = readRDS(file = "data/species_list_terradat.rds"),
                               data_fresh = TRUE,
                               data = NULL,
                               raw_data = NULL,
@@ -1082,46 +1100,133 @@ server <- function(input, output, session) {
                        "Please use the buttons found on the left side of the map to draw your polygon boundary."))
   })
   
+  observeEvent(eventExpr = list(input$query_method,
+                                input$keys,
+                                input$ldc_no_credentials_confirmation,
+                                input$ldc_credentials_email,
+                                input$ldc_credentials_password,
+                                input$polygon_source,
+                                input$polygons_layer,
+                                workspace$drawn_polygon_sf),
+               handlerExpr = {
+                 message("Considering whether to render the fetch button.")
+                 
+                 if (req(input$query_method) %in% c("EcologicalSiteID", "PrimaryKey", "ProjectKey")) {
+                   message(paste0("query_method is ", input$query_method))
+                   if (req(input$keys) != "") {
+                     message(paste0("keys is ", input$keys))
+                     fetch_ready <- TRUE
+                   } else {
+                     message("No valid keys value. Holding off on rendering the fetch button.")
+                     fetch_ready <- FALSE
+                   }
+                 } else {
+                   message("stupid")
+                 }
+                 message("Still considering whether to render the fetch button.")
+                 if (req(input$query_method) == "spatial") {
+                   message(paste0("query_method is ", input$query_method))
+                   if (req(input$polygon_source) == "upload" & req(input$polygons_layer) != "") {
+                     message(paste0("The polygon_source is 'upload' and polygons_layer is ",
+                                    input$polygons_layer))
+                     fetch_ready <- TRUE
+                   } else if (req(input$polygon_source) == "draw" & !is.null(req(workspace$drawn_polygon_sf))) {
+                     message("The polygon_source is 'draw' and drawn_polygon_sf is not NULL.")
+                     fetch_ready <- TRUE
+                   } else {
+                     fetch_ready <- FALSE
+                   }
+                 } else {
+                   message("still stupid")
+                 }
+                 message(paste0("fetch_ready is ", fetch_ready))
+                 if (fetch_ready) {
+                   message("Checking out credential situation.")
+                   
+                   if (req(input$data_source) %in% c("ldc")) {
+                     message("The user wants to query for sure. Evaluating to see if credentials look good enough.")
+                     if (req(input$ldc_no_credentials_confirmation)) {
+                       message("No credentials provided. Rendering fetch button.")
+                       output$fetch_ui <- renderUI(expr = tagList(br(),
+                                                                  actionButton(inputId = "fetch_data",
+                                                                               label = "Fetch data")))
+                     } else {
+                       # These are obviously not stringent, but I'm also unclear
+                       # on if the username will always be an email address so
+                       # this is just covering other cases instead of requiring
+                       # a true email format.
+                       has_vaid_looking_email <-  nchar(input$ldc_credentials_email) > 4
+                       has_valid_looking_password <- nchar(input$ldc_credentials_password) > 0
+                       if (has_valid_looking_email & has_valid_looking_password) {
+                         message("Credentials look valid enough to render the fetch button. Rendering now.")
+                         output$fetch_ui <- renderUI(expr = tagList(br(),
+                                                                    actionButton(inputId = "fetch_data",
+                                                                                 label = "Fetch data")))
+                       } else {
+                         message("Credentials don't look valid enough to render the fetch button. Skipping rendering for now.")
+                         output$fetch_ui <- NULL
+                       }
+                     }
+                   } else {
+                     message("Data are going to be uploaded. No need to check credentials or render the fetch button.")
+                     output$fetch_ui <- NULL
+                   }
+                 }
+               })
+  
   # Add a fetch button when grabbing data from the LDC and the query criteria
   # are available
   # Apparently since the tool will never have input$keys and input$polygons_layer
   # at the same time, I can't capture them both in a single conditional, but I
   # can do it in two separate ones rendering an identical element because I know
   # they'll never come into conflict
-  output$fetch_ui1 <- renderUI(expr = if (req(input$query_method %in% c("EcologicalSiteID", "PrimaryKey", "ProjectKey") & input$keys != "")) {
-    message("Checking to see if it's time to render the fetch button.")
-    # if (input$ldc_no_credentials_confirmation) {
-    #   message("No need for credentials. Rendering fetch button.")
-    #   tagList(br(),
-    #           actionButton(inputId = "fetch_data",
-    #                        label = "Fetch data"))
-    # } else if (nchar(input$ldc_credentials_email) > 4 & nchar(input$ldc_credentials_password) > 0) {
-    #   message("Credentials available to try. Rendering fetch button.")
-    #   tagList(br(),
-    #           actionButton(inputId = "fetch_data",
-    #                        label = "Fetch data"))
-    # }
-    if (input$ldc_no_credentials_confirmation | req(nchar(input$ldc_credentials_email) > 4 & nchar(input$ldc_credentials_password) > 0)) {
-      message("Credentials situation workable. Rendering fetch button.")
-      tagList(br(),
-              actionButton(inputId = "fetch_data",
-                           label = "Fetch data"))
-    }
-  })
-  output$fetch_ui2 <- renderUI(expr = if (req(input$query_method == "spatial" & (input$polygon_source == "upload" & input$polygons_layer != ""))) {
-    if (req(input$ldc_no_credentials_confirmation) | (req(nchar(input$ldc_credentials_email) > 4 & nchar(input$ldc_credentials_password) > 0))) {
-      tagList(br(),
-              actionButton(inputId = "fetch_data",
-                           label = "Fetch data"))
-    }
-  })
-  output$fetch_ui3 <- renderUI(expr = if (req(input$query_method == "spatial" & input$polygon_source == "draw" & !is.null(workspace$drawn_polygon_sf))) {
-    if (req(input$ldc_no_credentials_confirmation | (nchar(input$ldc_credentials_email) > 4 & nchar(input$ldc_credentials_password) > 0))) {
-      tagList(br(),
-              actionButton(inputId = "fetch_data",
-                           label = "Fetch data"))
-    }
-  })
+  # output$fetch_ui1 <- renderUI(expr = if (req(input$query_method %in% c("EcologicalSiteID", "PrimaryKey", "ProjectKey") & input$keys != "")) {
+  #   message("Checking to see if it's time to render the fetch button.")
+  #   message(paste0("query_method is ",input$query_method, " and the key value isn't just ''. Checking what's up with credentials."))
+  #   # if (input$ldc_no_credentials_confirmation) {
+  #   #   message("No need for credentials. Rendering fetch button.")
+  #   #   tagList(br(),
+  #   #           actionButton(inputId = "fetch_data",
+  #   #                        label = "Fetch data"))
+  #   # } else if (nchar(input$ldc_credentials_email) > 4 & nchar(input$ldc_credentials_password) > 0) {
+  #   #   message("Credentials available to try. Rendering fetch button.")
+  #   #   tagList(br(),
+  #   #           actionButton(inputId = "fetch_data",
+  #   #                        label = "Fetch data"))
+  #   # }
+  #   if (input$ldc_no_credentials_confirmation | req(nchar(input$ldc_credentials_email) > 4 & nchar(input$ldc_credentials_password) > 0)) {
+  #     message("Credentials situation workable. Rendering fetch button.")
+  #     tagList(br(),
+  #             actionButton(inputId = "fetch_data",
+  #                          label = "Fetch data"))
+  #   } else {
+  #     message("Credentials situation unworkable. Waiting to render fetch button.")
+  #   }
+  # })
+  # output$fetch_ui2 <- renderUI(expr = if (req(input$query_method == "spatial" & (input$polygon_source == "upload" & input$polygons_layer != ""))) {
+  #   message("Checking to see if it's time to render the fetch button.")
+  #   message(paste0("query_method is spatial, polygon_source is ", input$polygon_source, " and polygons_layer is ", input$polygons_layer, "."))
+  #   if (req(input$ldc_no_credentials_confirmation) | (req(nchar(input$ldc_credentials_email) > 4 & nchar(input$ldc_credentials_password) > 0))) {
+  #     message("Credentials situation workable. Rendering fetch button.")
+  #     tagList(br(),
+  #             actionButton(inputId = "fetch_data",
+  #                          label = "Fetch data"))
+  #   } else {
+  #     message("Credentials situation unworkable. Waiting to render fetch button.")
+  #   }
+  # })
+  # output$fetch_ui3 <- renderUI(expr = if (req(input$query_method == "spatial" & input$polygon_source == "draw" & !is.null(workspace$drawn_polygon_sf))) {
+  #   message("Checking to see if it's time to render the fetch button.")
+  #   message(paste0("query_method is spatial, polygon_source is ", input$polygon_source, " and drawn_polygon_sf is not NULL."))
+  #   if (req(input$ldc_no_credentials_confirmation | (nchar(input$ldc_credentials_email) > 4 & nchar(input$ldc_credentials_password) > 0))) {
+  #     message("Credentials situation workable. Rendering fetch button.")
+  #     tagList(br(),
+  #             actionButton(inputId = "fetch_data",
+  #                          label = "Fetch data"))
+  #   } else {
+  #     message("Credentials situation unworkable. Waiting to render fetch button.")
+  #   }
+  # })
   
   # Building the links to other tabs!
   # Note that we have to do this with a() and an onclick argument that calls the
@@ -1621,7 +1726,8 @@ server <- function(input, output, session) {
                                             "If you want to add additional information about species to the data (e.g., conservation status, forage quality, functional group) you can join a lookup table to the data.",
                                             br(),
                                             br(),
-                                            "The built-in lookup table is derived from USDA Plants and includes growth habit and duration for all species in the database. Note that many species may be listed in USDA Plants as having multiple growth habits or durations but the lookup table only includes one for each, the more persistent option.",
+                                            "The table derived from the USDA Plants includes growth habit and duration for all species in the database. Note that many species may be listed in USDA Plants as having multiple growth habits or durations but the lookup table only includes one for each, the more persistent option.",
+                                            "The Terrestrial AIM table is the same used for calculating indicators in the BLM Terrestrial AIM Database (TerrADat) and includes growth habit and duration.",
                                             br(),
                                             br(),
                                             "If you have other attributes to add or wish to specify different growth habits and durations for species, you can instead upload a lookup table as a CSV. It must have a variable for the species code and only one observation/row per species code.",
@@ -2478,9 +2584,12 @@ server <- function(input, output, session) {
                  
                  message("Attempting to update the selected variables in the species data")
                  # For the joining variable
-                 if ("code" %in% current_species_data_vars) {
-                   message("Found 'code' in the species data. Setting that as the species_joining_var")
-                   selection <- "code"
+                 proposed_code_var <- base::intersect(x = c("NameCode",
+                                                            "code"),
+                                                      current_species_data_vars)[1]
+                 if (length(proposed_code_var) > 0) {
+                   message(paste0("Found '", proposed_code_var, "' in the species data. Setting that as the species_joining_var"))
+                   selection <- proposed_code_var
                  } else {
                    message("Setting species_joining_var to ''")
                    selection <- ""
@@ -2549,19 +2658,19 @@ server <- function(input, output, session) {
                    message("Attempting to use the provided LDC credentials.")
                    # if (req(!identical(input$ldc_credentials_email, workspace[["username"]]))) {
                    #   message("LDC username updated")
-                     workspace[["username"]] <- input$ldc_credentials_email
-                     if (workspace[["username"]] == "") {
-                       workspace[["username"]] <- NULL
-                     }
-                     message(paste("workspace$username is:", workspace[["username"]]))
+                   workspace[["username"]] <- input$ldc_credentials_email
+                   if (workspace[["username"]] == "") {
+                     workspace[["username"]] <- NULL
+                   }
+                   message(paste("workspace$username is:", workspace[["username"]]))
                    # }
                    # if (req(!identical(input$ldc_credentials_password, workspace[["password"]]))) {
                    #   message("LDC password updated")
-                     workspace[["password"]] <- input$ldc_credentials_password
-                     if (workspace[["password"]] == "") {
-                       workspace[["password"]] <- NULL
-                     }
-                     message(paste("workspace$password is:", workspace[["password"]]))
+                   workspace[["password"]] <- input$ldc_credentials_password
+                   if (workspace[["password"]] == "") {
+                     workspace[["password"]] <- NULL
+                   }
+                   message(paste("workspace$password is:", workspace[["password"]]))
                    # }
                    
                    # Provided we want a token, try to make that happen.
@@ -3465,12 +3574,12 @@ server <- function(input, output, session) {
                        message("Getting ready to add generic codes")
                        message(paste0("length(workspace$data) is ",
                                       length(workspace$data)))
-                       species_list_with_generics <- unique(terradactyl::generic_growth_habits(data = workspace$data,
-                                                                                               data_code = input$data_joining_var,
-                                                                                               species_list = workspace$species_data,
-                                                                                               species_code = input$species_joining_var,
-                                                                                               species_growth_habit_code = input$growth_habit_var,
-                                                                                               species_duration = input$duration_var))
+                       species_list_with_generics <- unique(generic_growth_habits(data = workspace$data,
+                                                                                  data_code = input$data_joining_var,
+                                                                                  species_list = workspace$species_data,
+                                                                                  species_code = input$species_joining_var,
+                                                                                  species_growth_habit_code = input$growth_habit_var,
+                                                                                  species_duration = input$duration_var))
                        # Make sure that the growth habit and duration information is
                        # in the correct variables.
                        # Which indices have the attributed generic codes?
@@ -3699,7 +3808,7 @@ server <- function(input, output, session) {
                                 
                                 if (length(missing_lpi_grouping_vars) < 1) {
                                   message("No variables missing!")
-                                  lpi_cover_string <- paste0("tryCatch(terradactyl::pct_cover(",
+                                  lpi_cover_string <- paste0("tryCatch(pct_cover(",
                                                              "lpi_tall = workspace$calc_data,",
                                                              "tall = input$lpi_output_format == 'long',",
                                                              "hit = input$lpi_hit,",
@@ -3718,7 +3827,7 @@ server <- function(input, output, session) {
                                                    closeButton = TRUE,
                                                    id = "missing_lpi_grouping_vars",
                                                    type = "warning")
-                                  lpi_cover_string <- paste0("tryCatch(terradactyl::pct_cover(",
+                                  lpi_cover_string <- paste0("tryCatch(pct_cover(",
                                                              "lpi_tall = workspace$calc_data,",
                                                              "tall = input$lpi_output_format == 'long',",
                                                              "hit = input$lpi_hit,",
@@ -3728,7 +3837,7 @@ server <- function(input, output, session) {
                                 
                               } else {
                                 message("No grouping variables.")
-                                lpi_cover_string <- paste0("tryCatch(terradactyl::pct_cover(",
+                                lpi_cover_string <- paste0("tryCatch(pct_cover(",
                                                            "lpi_tall = workspace$calc_data,",
                                                            "tall = input$lpi_output_format == 'long',",
                                                            "hit = input$lpi_hit,",
@@ -3739,42 +3848,42 @@ server <- function(input, output, session) {
                               message("This is a specialized LPI call and will be using a wrapper for pct_cover()")
                               switch(input$lpi_hit,
                                      "species" = {
-                                       lpi_cover_string <- paste0("tryCatch(terradactyl::pct_cover_species(",
+                                       lpi_cover_string <- paste0("tryCatch(pct_cover_species(",
                                                                   "lpi_tall = workspace$calc_data,",
                                                                   "tall = input$lpi_output_format == 'long',",
                                                                   "by_line = input$lpi_unit == 'line'",
                                                                   "),error = function(error){error})")
                                      },
                                      "bare_ground" = {
-                                       lpi_cover_string <- paste0("tryCatch(terradactyl::pct_cover_bare_soil(",
+                                       lpi_cover_string <- paste0("tryCatch(pct_cover_bare_soil(",
                                                                   "lpi_tall = workspace$calc_data,",
                                                                   "tall = input$lpi_output_format == 'long',",
                                                                   "by_line = input$lpi_unit == 'line'",
                                                                   "),error = function(error){error})")
                                      },
                                      "litter" = {
-                                       lpi_cover_string <- paste0("tryCatch(terradactyl::pct_cover_litter(",
+                                       lpi_cover_string <- paste0("tryCatch(pct_cover_litter(",
                                                                   "lpi_tall = workspace$calc_data,",
                                                                   "tall = input$lpi_output_format == 'long',",
                                                                   "by_line = input$lpi_unit == 'line'",
                                                                   "),error = function(error){error})")
                                      },
                                      "between_plant" = {
-                                       lpi_cover_string <- paste0("tryCatch(terradactyl::pct_cover_between_plant(",
+                                       lpi_cover_string <- paste0("tryCatch(pct_cover_between_plant(",
                                                                   "lpi_tall = workspace$calc_data,",
                                                                   "tall = input$lpi_output_format == 'long',",
                                                                   "by_line = input$lpi_unit == 'line'",
                                                                   "),error = function(error){error})")
                                      },
                                      "total_foliar" = {
-                                       lpi_cover_string <- paste0("tryCatch(terradactyl::pct_cover_total_foliar(",
+                                       lpi_cover_string <- paste0("tryCatch(pct_cover_total_foliar(",
                                                                   "lpi_tall = workspace$calc_data,",
                                                                   "tall = input$lpi_output_format == 'long',",
                                                                   "by_line = input$lpi_unit == 'line'",
                                                                   "),error = function(error){error})")
                                      },
                                      "nonplant_ground" = {
-                                       lpi_cover_string <- paste0("tryCatch(terradactyl::pct_cover_all_ground(",
+                                       lpi_cover_string <- paste0("tryCatch(pct_cover_all_ground(",
                                                                   "lpi_tall = workspace$calc_data,",
                                                                   "tall = input$lpi_output_format == 'long',",
                                                                   "by_line = input$lpi_unit == 'line'",
@@ -3802,11 +3911,11 @@ server <- function(input, output, session) {
                             } else {
                               message("Gap breaks are all good and at least one indicator type is selected")
                               message("Calculating gap")
-                              gap_results <- tryCatch(terradactyl::gap_cover(gap_tall = workspace$calc_data,
-                                                                             tall = input$gap_output_format == "long",
-                                                                             breaks = current_gap_breaks,
-                                                                             type = input$gap_type,
-                                                                             by_line = (input$gap_unit == "line")),
+                              gap_results <- tryCatch(gap_cover(gap_tall = workspace$calc_data,
+                                                                tall = input$gap_output_format == "long",
+                                                                breaks = current_gap_breaks,
+                                                                type = input$gap_type,
+                                                                by_line = (input$gap_unit == "line")),
                                                       error = function(error){
                                                         error
                                                       })
@@ -3891,7 +4000,7 @@ server <- function(input, output, session) {
                                                    collapse = ", ")))
                               
                               if (length(missing_height_grouping_vars) < 1) {
-                                height_cover_string <- paste0("tryCatch(terradactyl::mean_height(",
+                                height_cover_string <- paste0("tryCatch(mean_height(",
                                                               "height_tall = workspace$calc_data,",
                                                               "method = 'mean',",
                                                               "omit_zero = input$height_omit_zero,",
@@ -3911,7 +4020,7 @@ server <- function(input, output, session) {
                                                  closeButton = TRUE,
                                                  id = "missing_height_grouping_vars",
                                                  type = "warning")
-                                height_cover_string <- paste0("tryCatch(terradactyl::mean_height(",
+                                height_cover_string <- paste0("tryCatch(mean_height(",
                                                               "height_tall = workspace$calc_data,",
                                                               "method = 'mean',",
                                                               "omit_zero = input$height_omit_zero,",
@@ -3923,7 +4032,7 @@ server <- function(input, output, session) {
                               
                             } else {
                               message("No grouping vars!")
-                              height_cover_string <- paste0("tryCatch(terradactyl::mean_height(",
+                              height_cover_string <- paste0("tryCatch(mean_height(",
                                                             "height_tall = workspace$calc_data,",
                                                             "method = 'mean',",
                                                             "omit_zero = input$height_omit_zero,",
@@ -3941,22 +4050,22 @@ server <- function(input, output, session) {
                           },
                           "soilstability" = {
                             message("Calculating soil stability")
-                            current_results <- tryCatch(terradactyl::soil_stability(soil_stability_tall = workspace$calc_data,
-                                                                                    all = "all" %in% input$soil_covergroups,
-                                                                                    cover = "covered" %in% input$soil_covergroups,
-                                                                                    uncovered = "uncovered" %in% input$soil_covergroups,
-                                                                                    all_cover_type = "by_type" %in% input$soil_covergroups,
-                                                                                    tall = input$soil_output_format == "long"),
+                            current_results <- tryCatch(soil_stability(soil_stability_tall = workspace$calc_data,
+                                                                       all = "all" %in% input$soil_covergroups,
+                                                                       cover = "covered" %in% input$soil_covergroups,
+                                                                       uncovered = "uncovered" %in% input$soil_covergroups,
+                                                                       all_cover_type = "by_type" %in% input$soil_covergroups,
+                                                                       tall = input$soil_output_format == "long"),
                                                         error = function(error){
                                                           error
                                                         })
                           },
                           "species" = {
                             message("Calculating species counts from species richness")
-                            current_results <- tryCatch(terradactyl::species_count(data = workspace$calc_data,
-                                                                                   species_var = input$species_species_var,
-                                                                                   grouping_vars = input$species_grouping_vars,
-                                                                                   tall = input$species_output_format == "long"),
+                            current_results <- tryCatch(species_count(data = workspace$calc_data,
+                                                                      species_var = input$species_species_var,
+                                                                      grouping_vars = input$species_grouping_vars,
+                                                                      tall = input$species_output_format == "long"),
                                                         error = function(error){
                                                           error
                                                         })
@@ -4074,7 +4183,8 @@ server <- function(input, output, session) {
                    
                    message("output$results_table rendered")
                    software_version_string <- paste0("These results were calculated using terradactyl v",
-                                                     packageVersion("terradactyl"),
+                                                     # packageVersion("terradactyl"),
+                                                     "1.1.0",
                                                      " and R v",
                                                      R.Version()$major, ".", R.Version()$minor,
                                                      " on ",

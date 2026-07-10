@@ -11,7 +11,7 @@ source("functions.R")
 
 # Define UI for application
 ui <- fluidPage(
-  title = "Rangeland Indicator Calculator",
+  title = "Grazing Lands Indicator Calculator",
   useShinyjs(),
   use_cicerone(),
   tags$head(

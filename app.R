@@ -404,7 +404,8 @@ ui <- fluidPage(
                                                                                                              radioButtons(inputId = "species_source",
                                                                                                                           label = "Species lookup table source",
                                                                                                                           choices = c("None" = "none",
-                                                                                                                                      "Default USDA Plants" = "default",
+                                                                                                                                      "BLM Terrestrial AIM" = "tblnationalplants",
+                                                                                                                                      "USDA Plants" = "usda",
                                                                                                                                       "Upload" = "upload"),
                                                                                                                           selected = "none")),
                                                                                                       column(width = 1,
@@ -433,6 +434,17 @@ ui <- fluidPage(
                                                                                                                                                    multiple = FALSE)),
                                                                                                                                 column(width = 1,
                                                                                                                                        actionButton(inputId = "growth_habit_var_info",
+                                                                                                                                                    label = "",
+                                                                                                                                                    class = "info-btn",
+                                                                                                                                                    icon = icon("circle-question")))),
+                                                                                                                       fluidRow(column(width = 10,
+                                                                                                                                       selectInput(inputId = "growth_habit_sub_var",
+                                                                                                                                                   label = "Growth habit subcategory variable in lookup table",
+                                                                                                                                                   choices = c(""),
+                                                                                                                                                   selected = "",
+                                                                                                                                                   multiple = FALSE)),
+                                                                                                                                column(width = 1,
+                                                                                                                                       actionButton(inputId = "growth_habit_sub_var_info",
                                                                                                                                                     label = "",
                                                                                                                                                     class = "info-btn",
                                                                                                                                                     icon = icon("circle-question")))),
@@ -560,11 +572,11 @@ ui <- fluidPage(
                                                                                  "First hit" = "first",
                                                                                  "Basal hit" = "basal",
                                                                                  "Species" = "species",
-                                                                                 "Bare soil" = "bare_ground",
+                                                                                 "Bare soil" = "bare soil",
                                                                                  "Litter" = "litter",
-                                                                                 "Between-plant" = "between_plant",
-                                                                                 "Total foliar" = "total_foliar",
-                                                                                 "Non-plant surface" = "nonplant_ground"))),
+                                                                                 "Between-plant" = "between plant",
+                                                                                 "Total foliar" = "total foliar",
+                                                                                 "Non-plant surface" = "ground"))),
                                                   column(width = 1,
                                                          actionButton(inputId = "lpi_hit_info",
                                                                       label = "",
@@ -727,18 +739,18 @@ ui <- fluidPage(
                                                                       class = "info-btn",
                                                                       icon = icon("circle-question"))))
                         ),
-                        conditionalPanel(condition = "input.data_type == 'species'",
-                                         fluidRow(column(width = 10,
-                                                         selectInput(inputId = "species_output_format",
-                                                                     label = "Output format",
-                                                                     choices = c("Wide" = "wide",
-                                                                                 "Long" = "long"))),
-                                                  column(width = 1,
-                                                         actionButton(inputId = "species_output_format_info",
-                                                                      label = "",
-                                                                      class = "info-btn",
-                                                                      icon = icon("circle-question"))))
-                        ),
+                        # conditionalPanel(condition = "input.data_type == 'species'",
+                        #                  fluidRow(column(width = 10,
+                        #                                  selectInput(inputId = "species_output_format",
+                        #                                              label = "Output format",
+                        #                                              choices = c("Wide" = "wide",
+                        #                                                          "Long" = "long"))),
+                        #                           column(width = 1,
+                        #                                  actionButton(inputId = "species_output_format_info",
+                        #                                               label = "",
+                        #                                               class = "info-btn",
+                        #                                               icon = icon("circle-question"))))
+                        # ),
                         fluidRow(column(width = 10,
                                         selectInput(inputId = "additional_output_vars",
                                                     label = "Additional metadata variables",
@@ -824,7 +836,14 @@ server <- function(input, output, session) {
                               drawn_polygon_sf = NULL,
                               metadata_lut = NULL,
                               polygons = NULL,
-                              default_species_filename = "usda_plants_characteristics_lookup_20210830.csv",
+                              usda = read.csv(file.path(getwd(),
+                                                        "data",
+                                                        "usda_plants_characteristics_lookup_20260714.csv"),
+                                              stringsAsFactors = FALSE),
+                              tblnationalplants = read.csv(file.path(getwd(),
+                                                                     "data",
+                                                                     "tblNationalPlants.csv"),
+                                                           stringsAsFactors = FALSE),
                               data_fresh = TRUE,
                               data = NULL,
                               raw_data = NULL,
@@ -1213,7 +1232,7 @@ server <- function(input, output, session) {
   })
   
   ###### Configure Data tab ######
-  output$add_generic_species_button_ui <- renderUI( if(req(!is.null(workspace$data)) & req(input$add_generic_species) & req(input$growth_habit_var != "") & req(input$duration_var != "")) {
+  output$add_generic_species_button_ui <- renderUI( if(req(!is.null(workspace$data)) & req(input$add_generic_species) & req(input$growth_habit_var != "") & req(input$growth_habit_sub_var != "") & req(input$duration_var != "")) {
     fluidRow(column(width = 12,
                     align = "center",
                     actionButton(inputId = "add_generic_species_button",
@@ -1623,7 +1642,7 @@ server <- function(input, output, session) {
                                             "If you want to add additional information about species to the data (e.g., conservation status, forage quality, functional group) you can join a lookup table to the data.",
                                             br(),
                                             br(),
-                                            "The built-in lookup table is derived from USDA Plants and includes growth habit and duration for all species in the database. Note that many species may be listed in USDA Plants as having multiple growth habits or durations but the lookup table only includes one for each, the more persistent option.",
+                                            "The built-in lookup tables are one tblNationalPlants which is used by the BLM to produce the values in the Terrestrial AIM Database (TerrADat) and one derived from USDA Plants which has been simplified to include only the most persistent value for growth habits and durations for species that may be associated with multiple, e.g. only 'perennial' when the species may be perennial in some regions and annual in others.",
                                             br(),
                                             br(),
                                             "If you have other attributes to add or wish to specify different growth habits and durations for species, you can instead upload a lookup table as a CSV. It must have a variable for the species code and only one observation/row per species code.",
@@ -1646,7 +1665,17 @@ server <- function(input, output, session) {
                  message("Displaying info about growth habit variable")
                  showModal(ui = modalDialog(size = "s",
                                             easyClose = TRUE,
-                                            "In order to add generic species' growth habit information (e.g. forb, graminoid, tree) to a lookup table, you must specify the variable in the lookup table already containing the growth habit information.",
+                                            "In order to add generic species' growth habit information (e.g. woody, herbaceous) to a lookup table, you must specify the variable in the lookup table already containing the growth habit information.",
+                                            footer = tagList(modalButton("Close")))
+                 )
+               })
+  
+  observeEvent(eventExpr = input$growth_habit_sub_var_info,
+               handlerExpr = {
+                 message("Displaying info about growth habit sub variable")
+                 showModal(ui = modalDialog(size = "s",
+                                            easyClose = TRUE,
+                                            "In order to add generic species' growth habit subcategory information (e.g. forb, graminoid, tree) to a lookup table, you must specify the variable in the lookup table already containing the growth habit subcategory information.",
                                             footer = tagList(modalButton("Close")))
                  )
                })
@@ -2456,19 +2485,16 @@ server <- function(input, output, session) {
   observeEvent(eventExpr = input$species_source,
                handlerExpr = {
                  message("input$species_source has changed")
-                 if (input$species_source == "default") {
-                   message("Species source set to default. Reading in default species data.")
-                   defaults_species_filepath <- paste0(workspace$original_directory,
-                                                       "/",
-                                                       workspace$default_species_filename)
-                   workspace[["species_data"]] <- read.csv(defaults_species_filepath,
-                                                           stringsAsFactors = FALSE)
+                 if (input$species_source %in% c("usda", "tblnationalplants")) {
+                   message("Species source set to usda.")
+                   
+                   workspace[["species_data"]] <- workspace[[input$species_source]]
                    # TODO
                    # Set workspace$species_data to the default list (which doesn't exist yet)
                    # Set this variable so we can handle the data appropriately based on source
-                   workspace$current_species_source <- "default"
+                   workspace$current_species_source <- input$species_source
                  } else {
-                   message("Species source is not default. Doing nothing")
+                   message("Species source is not one of the built-ins. Doing nothing")
                  }
                })
   

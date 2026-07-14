@@ -1,772 +1,369 @@
-get_ldc_token <- function(username,
-                          password) {
-  if (is.character(username)) {
-    if (length(username) > 1) {
-      stop("Your username must be a single character string.")
-    }
-  } else {
-    stop("Your username must be a single character string.")
-  }
-  if (is.character(password)) {
-    if (length(password) > 1) {
-      stop("Your password must be a single character string.")
-    }
-  } else {
-    stop("Your password must be a single character string.")
-  }
+# Disable once this is exported in terradactyl
+pct_cover_indicators <- function(lpi_tall,
+                                 indicator_families = c("total foliar",
+                                                        "ground",
+                                                        "between plant",
+                                                        "bare soil",
+                                                        "litter",
+                                                        "live",
+                                                        "species"),
+                                 tall_output = c("total foliar" = FALSE,
+                                                 "ground" = FALSE,
+                                                 "between plant" = FALSE,
+                                                 "bare soil" = FALSE,
+                                                 "litter" = FALSE,
+                                                 "live" = FALSE,
+                                                 # Special case!
+                                                 "species" = TRUE),
+                                 by_line = FALSE,
+                                 hit_type = c(live = "any",
+                                              species = "any"),
+                                 indicator_variables = list(`total foliar` = c("code",
+                                                                               "GrowthHabit"),
+                                                            ground = "code",
+                                                            `between plant` = "code",
+                                                            `bare soil` = "code",
+                                                            litter = "code",
+                                                            live = c("chckbox",
+                                                                     "code"),
+                                                            species = "code"),
+                                 verbose = FALSE,
+                                 digits = 6) {
+  #### Santization and setup ###################################################
+  # TODO: ALL THE COMPLIANCE CHECKS
   
-  # Attempt to get an authentication response
-  authentication_response <- httr::POST(url = "https://oox5sjuicqhezohcpnbsesp32y0yrcbm.lambda-url.us-east-1.on.aws/",
-                                        body = list(username = username, 
-                                                    password = password),
-                                        encode = "json")
+  # We'll use this to make a lookup table for which kind of cover values to
+  # calculate based on which sets of indicators are asked for.
+  families_list <- list(any = c("litter"),
+                        first = c("total foliar",
+                                  "between plant",
+                                  "bare soil"),
+                        basal = "ground")
   
-  # What if there's an error????
-  if (httr::http_error(authentication_response)) {
-    stop(paste0("Retrieving authentication token from the API failed with status ",
-                authentication_response$status_code))
-  }
-  
-  output_raw_character <- rawToChar(authentication_response[["content"]])
-  
-  if (grepl(x = output_raw_character, pattern = "^Error")) {
-    stop(output_raw_character)
-  }
-  
-  output <- jsonlite::fromJSON(txt = output_raw_character)[["AuthenticationResult"]]
-  
-  # We'll add an expiration time so we can check the need for a refreshed token
-  # without making an API call that gets rejected.
-  # This cuts 5 seconds off just as a bit of buffer.
-  output[["expiration_time"]] <- Sys.time() + output[["ExpiresIn"]] - 5
-  # Turns out this was overengineered, but keeping it for future reference.
-  # output[["expiration_time"]] <- lubridate::as_date(lubridate::seconds(Sys.time()) + lubridate::seconds(output[["ExpiresIn"]] - 5))
-  
-  output
-}
-
-#' Fetching data from the Landscape Data Commons via API query
-#' @description A function for making API calls to the Landscape Data Commons based on the table, key variable, and key variable values. It will return a table of records of the requested data type from the LDC in which the variable \code{key_type} contains only values found in \code{keys}. See the \href{https://api.landscapedatacommons.org/api-docs}{API documentation} to see which variables (i.e. \code{key_type} values) are valid for each data type.
-#' @param keys Optional character vector. A character vector of all the values to search for in \code{key_type}. The returned data will consist only of records where \code{key_type} contained one of the key values, but there may be keys that return no records. If \code{NULL} then the entire table will be returned. Defaults to \code{NULL}.
-#' @param key_type Optional character string. The name of the variable in the data to search for the values in \code{keys}. This must be the name of a variable that exists in the requested data type's table, e.g. \code{"PrimaryKey"} exists in all tables, but \code{"EcologicalSiteID"} is found only in some. If the function returns a status code of 500 as an error, this variable may not be found in the requested data type. If \code{NULL} then the entire table will be returned. Defaults to \code{NULL}.
-#' @param data_type Character string. The type of data to query. Note that the variable specified as \code{key_type} must appear in the table corresponding to \code{data_type}. Valid values are: \code{'gap'}, \code{'header'}, \code{'height'}, \code{'lpi'}, \code{'soilstability'}, \code{'speciesinventory'}, \code{'indicators'}, \code{'species'}, \code{'dustdeposition'}, \code{'horizontalflux'}, and \code{'schema'}.
-#' @param username Optional character string. The username to supply to the Landscape Data Commons API. Some data in the Landscape Data Commons are accessible only to users with appropriate credentials. You do not need to supply credentials, but an API request made without them may return fewer or no data. This argument will be ignored if \code{password} is \code{NULL}. Defaults to \code{NULL}.
-#' @param password Optional character string. The password to supply to the Landscape Data Commons API.  Some data in the Landscape Data Commons are accessible only to users with appropriate credentials. You do not need to supply credentials, but an API request made without them may return fewer or no data. This argument will be ignored if \code{username} is \code{NULL}. Defaults to \code{NULL}.
-#' @param key_chunk_size Numeric. The number of keys to send in a single query. Very long queries fail, so the keys may be chunked into smaller queries with the results of all the queries being combined into a single output. Defaults to \code{100}.
-#' @param timeout Numeric. The number of seconds to wait for a nonresponse from the API before considering the query to have failed. Defaults to \code{300}.
-#' @param take Optional numeric. The number of records to retrieve at a time. This is NOT the total number of records that will be retrieved! Queries that retrieve too many records at once can fail, so this allows the process to retrieve them in smaller chunks. The function will keep requesting records in chunks equal to this number until all matching records have been retrieved. If this value is too large (i.e., much greater than about \code{10000}), the server will likely respond with a 500 error. If \code{NULL} then all records will be retrieved in a single pass. Defaults to \code{NULL}.
-#' @param delay Optional numeric. The number of milliseconds to wait between API queries. Querying too quickly can crash an API or get you locked out, so adjust this as needed. Defaults to \code{500}.
-#' @param exact_match Logical. If \code{TRUE} then only records for which the provided keys are an exact match will be returned. If \code{FALSE} then records containing (but not necessarily matching exactly) the first provided key value will be returned e.g. searching with \code{exact_match = FALSE}, \code{keys = "42"}, and \code{key_type = "EcologicalSiteID"} would return all records in which the ecological site ID contained the string \code{"42"} such as \code{"R042XB012NM"} or \code{"R036XB042NM"}. If \code{FALSE} only the first provided key value will be considered. Using non-exact matching will dramatically increase server response times, so use with caution. Defaults to \code{TRUE}.
-#' @param verbose Logical. If \code{TRUE} then the function will report additional diagnostic messages as it executes. Defaults to \code{FALSE}.
-#' @returns A data frame of records from the requested \code{data_type} which contain the values from \code{keys} in the variable \code{key_type}.
-#' @seealso
-#' * To query for data by spatial location, use \code{\link[=fetch_ldc_spatial]{fetch_ldc_spatial()}}.
-#' * To retrieve data by ecological site ID from a table that doesn't include ecological site ID use \code{\link[=fetch_ldc_ecosite]{fetch_ldc_ecosite()}}.
-#' @examples
-#' # To retrieve all sampling location metadata collected in the ecological sites R036XB006NM and R036XB007NM
-#' headers <- fetch_ldc(keys = c("R036XB006NM", "R036XB007NM"), key_type = "EcologicalSiteID", data_type = "header")
-#' # To retrieve all LPI data collected in ecological sites in the 036X Major Land Resource Area (MLRA)
-#' relevant_headers <- fetch_ldc(keys = "036X", key_type = "EcologicalSiteID", data_type = "header", exact_match = FALSE)
-#' lpi_data <- fetch_ldc(keys = relevant_headers$PrimaryKey, key_type = "PrimaryKey". data_type = "lpi", take = 10000)
-#' @export
-fetch_ldc <- function(keys = NULL,
-                      key_type = NULL,
-                      data_type,
-                      username = NULL,
-                      password = NULL,
-                      token = NULL,
-                      key_chunk_size = 100,
-                      timeout = 300,
-                      take = NULL,
-                      delay = 500,
-                      exact_match = TRUE,
-                      verbose = FALSE) {
-  user_agent <- "http://github.com/Landscape-Data-Commons/trex"
-  base_url <- "https://api.landscapedatacommons.org/api/v1/"
-  valid_tables <- data.frame(data_type = c("gap",
-                                           "header",
-                                           "height",
-                                           "lpi",
-                                           "soilstability",
-                                           "speciesinventory",
-                                           "indicators",
-                                           "species",
-                                           "dustdeposition",
-                                           "horizontalflux",
-                                           "schema",
-                                           "dataGap",
-                                           "dataHeader",
-                                           "dataHeight",
-                                           "dataLPI",
-                                           "dataSoilStability",
-                                           "dataSpeciesInventory",
-                                           "geoIndicators",
-                                           "geoSpecies",
-                                           "dataDustDeposition",
-                                           "dataHorizontalFlux",
-                                           "aerosummary"),
-                             table_name = c("dataGap",
-                                            "dataHeader",
-                                            "dataHeight",
-                                            "dataLPI",
-                                            "dataSoilStability",
-                                            "dataSpeciesInventory",
-                                            "geoIndicators",
-                                            "geoSpecies",
-                                            "dataDustDeposition",
-                                            "dataHorizontalFlux",
-                                            "tbl-schema/latest",
-                                            "dataGap",
-                                            "dataHeader",
-                                            "dataHeight",
-                                            "dataLPI",
-                                            "dataSoilStability",
-                                            "dataSpeciesInventory",
-                                            "geoIndicators",
-                                            "geoSpecies",
-                                            "dataDustDeposition",
-                                            "dataHorizontalFlux",
-                                            "aerosummary"))
-  if (!(data_type %in% valid_tables$data_type)) {
-    stop(paste0("data_type must be one of the following character strings (some are aliases of each other): ",
-                paste(valid_tables$data_type,
-                      collapse = ", "),
-                "."))
-  }
-  
-  current_table <- valid_tables[["table_name"]][valid_tables$data_type == data_type]
-  
-  if (!(class(keys) %in% c("character", "NULL"))) {
-    stop("keys must be a character string or vector of character strings or NULL.")
-  }
-  
-  if (!(class(key_type) %in% c("character", "NULL"))) {
-    stop("key_type must be a character string or NULL.")
-  }
-  
-  if (!is.null(keys) & is.null(key_type)) {
-    stop("Must provide key_type when providing keys.")
-  }
-  
-  if (!is.null(take)) {
-    if (!is.numeric(take) | length(take) > 1) {
-      stop("take must either be NULL or a single numeric value.")
-    }
-  }
-  
-  if (delay < 0) {
-    stop("delay must be a positive numeric value.")
-  } else {
-    # Convert the value from milliseconds to nanoseconds because we'll be using
-    # microbenchmark::get_nanotime() which returns the current time in nanoseconds
-    delay <- delay * 10^6
-  }
-  
-  # Check the user credentials
-  if (!is.null(token)) {
-    if (class(token) == "list") {
-      if (!("IdToken" %in% names(token))) {
-        stop("A valid bearer ID token must be a single character string or a single character string in a list stored at an index named 'IdToken'.")
-      } else if (class(token[["IdToken"]]) != "character") {
-        stop("A valid bearer ID token must be a single character string or a single character string in a list stored at an index named 'IdToken'.")
-      }
-      if (!("expiration_time" %in% names(token))) {
-        token[["expiration_time"]] <- Sys.time() + 3600
-      }
-    } else if (class(token) == "character") {
-      if (length(token) != 1) {
-        stop("A valid bearer ID token must be a single character string or a single character string in a list stored at an index named 'IdToken'.")
-      }
-      token <- list(IdToken = token,
-                    # This is just a rough guess on the validity window of the
-                    # token so we don't have to do more complicated handling
-                    # later.
-                    expiration_time = Sys.time() + 3600)
-    }
-  } else {
-    if (!identical(is.null(username), is.null(password))) {
-      if (is.null(username)) {
-        warning("No token or username provided. Ignoring provided password and retrieving only data which do not require credentials.")
-      }
-      if (is.null(password)) {
-        warning("No token or password provided. Ignoring provided username and retrieving only data which do not require credentials.")
-      }
-    } else if (!is.null(username) & !is.null(password)) {
-      if (class(username) != "character" | length(username) > 1) {
-        stop("Provided username must be a single character string.")
-      }
-      if (class(password) != "character" | length(password) > 1) {
-        stop("Provided username must be a single character string.")
-      }
-      token <- get_ldc_token(username = username,
-                             password = password)
-    } else if (verbose) {
-      message("No credentials provided. Retrieving only data which do not require credentials.")
-    }
-  }
-  
-  
-  # If there are no keys, grab the whole table
-  if (is.null(keys)) {
-    if (verbose) {
-      message("No keys provided; retrieving all records.")
-    }
-    if (!is.null(key_type)) {
-      warning("No keys provided. Ignoring key_type and retrieving all records.")
-    }
-    queries <- paste0(base_url,
-                      current_table)
-  } else {
-    # If there are keys, chunk them then build queries
-    # This helps prevent queries so long that they fail
-    if (verbose) {
-      message("Grouping keys into chunks for queries.")
-    }
-    # We don't know whether the keys came in as a vector of single keys or if
-    # one or more of the character strings contains keys separated by commas
-    # so we're going to handle that an get a vector of single-key strings
-    keys_vector <- unlist(lapply(X = keys,
-                                 FUN = function(X) {
-                                   trimws(unlist(stringr::str_split(string = X,
-                                                                    pattern = ",")))
-                                 }))
-    # OKAY! So it turns out that it's not impossible for keys to contain
-    # ampersands which will result in malformed API queries, so we'll replace
-    # them with the unicode reference %26
-    keys_vector_original <- keys_vector
-    keys_vector <- gsub(x = keys_vector,
-                        pattern = "[&]",
-                        replacement = "%26")
+  # The hit_type argument is used for "live" and per-species calculations
+  # because those requests can vary in terms of hit_type.
+  needed_hit_types <- intersect(x = c("live",
+                                      "species"),
+                                y = indicator_families)
+  if (length(needed_hit_types) > 0) {
+    hit_type <- hit_type[names(hit_type) %in% c("live",
+                                                "species")]
     
-    if (verbose & !identical(keys_vector_original, keys_vector)) {
-      warning("Some keys provided contained illegal characters and have been sanitized. All available data should still be retrieved for all provided keys.")
+    # Default to "any" for unspecified versions
+    missing_hit_types <- setdiff(x = c("live",
+                                       "species"),
+                                 y = names(hit_type))
+    for (current_missing_hit_type in missing_hit_types) {
+      hit_type[current_missing_hit_type] <- "any"
     }
     
-    if (!exact_match) {
-      if (verbose) {
-        message("Using non-exact matching for the key value.")
-      }
-      if (length(keys_vector) > 1) {
-        warning("There are multiple provided key values. Non-exact matching will only consider the first.")
-      }
-      keys_vector <- keys_vector[1]
+    # Add this information to the families_list object so we can include it in
+    # the lookup table.
+    for (current_hit_type in hit_type) {
+      families_list[[current_hit_type]] <- c(families_list[[current_hit_type]],
+                                             names(hit_type)[hit_type == current_hit_type]) |>
+        unique()
+    }
+  }
+  
+  # Make a lookup table with the indicator families and the hit types for easy
+  # reference later
+  calc_lut <- lapply(X = names(families_list),
+                     families_list = families_list,
+                     FUN = function(X, families_list){
+                       data.frame(hit = X,
+                                  cover_type = families_list[[X]])
+                     }) |>
+    dplyr::bind_rows() |>
+    dplyr::filter(.data = _,
+                  cover_type %in% indicator_families)
+  
+  indicator_variables_lut <- lapply(X = names(indicator_variables),
+                                    indicator_variables = indicator_variables,
+                                    FUN = function(X, indicator_variables){
+                                      data.frame(cover_type = X,
+                                                 indicator_variables = paste(indicator_variables[[X]],
+                                                                             collapse = "|"))
+                                    }) |>
+    dplyr::bind_rows()
+  
+  calc_lut <- dplyr::left_join(x = calc_lut,
+                               y = indicator_variables_lut,
+                               relationship = "one-to-one",
+                               by = "cover_type")
+  
+  #### Calculating the input cover values ######################################
+  # This is the minimum set of hit types to calculate for. The lapply() below
+  # will deal with the need for different grouping variables.
+  iteration_vector <- setNames(object = calc_lut$hit,
+                               nm = calc_lut$hit) |>
+    unique()
+  
+  # Get the data frames that we'll use to calculate the various indicators from.
+  # This'll be a list with one index per hit type and at each index a list
+  # containing a data frame for each set of needed grouping variables based on
+  # the indicator_variables list provided as an argument.
+  values_list <- lapply(X = iteration_vector,
+                        calc_lut = calc_lut,
+                        indicator_variables = indicator_variables,
+                        lpi_tall = lpi_tall,
+                        by_line = by_line,
+                        digits = digits,
+                        FUN = function(X, calc_lut, indicator_variables, lpi_tall, by_line, digits){
+                          current_hit_type <- X
+                          current_indicator_variables_list <- indicator_variables[dplyr::filter(.data = calc_lut,
+                                                                                                hit == current_hit_type)[["cover_type"]]] |>
+                            unique()
+                          
+                          current_indicator_variables_list <- sapply(X = current_indicator_variables_list,
+                                                                     collapse = "|",
+                                                                     FUN = paste) |>
+                            setNames(object = current_indicator_variables_list,
+                                     nm = _)
+                          
+                          hit_values_list <- lapply(X = current_indicator_variables_list,
+                                                    current_hit_type = current_hit_type,
+                                                    lpi_tall = lpi_tall,
+                                                    by_line = by_line,
+                                                    FUN = function(X, current_hit_type, lpi_tall, tall, by_line){
+                                                      # message(paste(current_hit_type, "by", paste(X,
+                                                      #                                             collapse = ", ")))
+                                                      pct_cover(lpi_tall = lpi_tall,
+                                                                tall = TRUE,
+                                                                hit = current_hit_type,
+                                                                by_line = by_line,
+                                                                indicator_variables = X,
+                                                                digits = digits)
+                                                    })
+                        })
+  names(values_list) <- iteration_vector
+  
+  #### Calculating outputs #####################################################
+  # Use the values_list to calculate the various indicators requested, storing
+  # them in outputs_list.
+  # These are hardcoded as individual if()s because they're all special.
+  # Maybe eventually this can be handled in a way that doesn't duplicate code.
+  outputs_list <- list()
+  
+  #_#_#_#_#_#_#_#_#
+  # species_test <- dplyr::filter(.data = species_file, HigherTaxon %in% c("lycophyte", "liverwort", "hornwort")) |>
+  #   dplyr::mutate(.data = _,
+  #                 bad_habit = grepl(x = GrowthHabitSub,
+  #                                   pattern = "^((non-?vascular)|(lichen)|(moss))$",
+  #                                   ignore.case = TRUE),
+  #                 lichenous = grepl(x = NameCode,
+  #                                   pattern = "(2?LICH[EI]N?\\d?)",
+  #                                   ignore.case = TRUE))
+  #
+  # dplyr::summarize(.data = species_test,
+  #               .by = tidyselect::all_of(x = c("GrowthHabitSub",
+  #                                              "bad_habit")),
+  #               n = dplyr::n())
+  
+  ##_#_#_#_#_#_#_#_#_
+  
+  ##### Total foliar cover -----------------------------------------------------
+  if ("total foliar" %in% indicator_families) {
+    # Calculate total foliar cover by summing the first hits for all plant
+    # species on a plot (and by line if requested)
+    current_lut <- dplyr::filter(.data = calc_lut,
+                                 cover_type == "total foliar")
+    # output <- values_list[[which(names(iteration_vector) == current_lut[["hit"]])]][[current_lut[["indicator_variables"]]]] |>
+    current_output <- values_list[[current_lut[["hit"]]]] |>
+      dplyr::select(.data = _,
+                    tidyselect::matches(current_lut[["indicator_variables"]])) |>
+      # This has gotten more complicated to reflect how codes are being used in
+      # 2026.
+      # There's now a check to not just look at character count but also
+      # GrowthHabitSub and the actual content of codes to screen out things that
+      # don't correspond to vascular species, e.g. "MOS2" or "2LICHEN"
+      dplyr::filter(.data = _,
+                    GrowthHabit != "Nonvascular",
+                    !(grepl(x = GrowthHabitSub,
+                            pattern = "^((non-?vascular$)|(lichen)|(moss$))",
+                            ignore.case = TRUE) |
+                        stringr::str_detect(string = indicator,
+                                            pattern = "^(((M(OS{1,2})?\\d+)|(MOSS))|(2?LICH[EI]N?\\d?))$")) &
+                      stringi::stri_length(indicator) >= 3) |>
+      # Replace the indicator value with "TotalFoliarCover" because we should only
+      # have records with recorded species at this point.
+      dplyr::mutate(.data = _,
+                    indicator = "TotalFoliarCover") |>
+      # Sum the remaining records, grouped by whatever variables aren't holding
+      # the percentages because those should be indicator (all the same value)
+      # and then whatever grouping variables came through the pct_cover().
+      dplyr::summarize(.data = _,
+                       .by = -tidyselect::any_of(x = c("percent")),
+                       indicator = dplyr::first(indicator),
+                       # The na.rm = TRUE should produce 0 when all inputs are
+                       # NA and effectively treat NA as 0 when real values are
+                       # involved.
+                       percent = sum(percent,
+                                     na.rm = TRUE))
+    
+    # Widen the data frame if the user asked for that.
+    if (!tall_output["total foliar"]) {
+      current_output <- tidyr::pivot_wider(data = current_output,
+                                           names_from = "indicator",
+                                           values_from = "percent",
+                                           values_fill = 0)
     }
     
-    # Figure out how many chunks to break these into based on the max number of
-    # keys in a chunk
-    key_chunk_count <- ceiling(length(keys_vector) / key_chunk_size)
+    # Can't hurt to ask for only distinct records, right?
+    outputs_list[["total_foliar"]] <- dplyr::distinct(current_output)
+  }
+  
+  ##### Ground (basal) cover ---------------------------------------------------
+  if ("ground" %in% indicator_families) {
+    current_lut <- dplyr::filter(.data = calc_lut,
+                                 cover_type == "ground")
+    current_output <- values_list[[current_lut[["hit"]]]][[current_lut[["indicator_variables"]]]] |>
+      # Remove all layer codes that are >= 3 codes (i.e., species codes)
+      # THIS SEEMS REALLY WRONG?????????????
+      dplyr::filter(.data = _,
+                    stringi::stri_length(indicator) < 3)
     
-    # Make the key chunks
-    # For each chunk, figure out the appropriate indices and paste together the
-    # relevant key values into strings that we can use to build per-chunk queries
-    keys_chunks <- sapply(X = 1:key_chunk_count,
-                          keys_vector = keys_vector,
-                          key_chunk_size = key_chunk_size,
-                          key_count = length(keys_vector),
-                          FUN = function(X, keys_vector, key_chunk_size, key_count) {
-                            min_index <- max(c(1, (X - 1) * key_chunk_size + 1))
-                            max_index <- min(c(key_count, X * key_chunk_size))
-                            indices <- min_index:max_index
-                            paste(keys_vector[indices],
-                                  collapse = ",")
-                          })
-    
-    if (verbose) {
-      if (length(keys_chunks == 1)) {
-        message("Building query.")
-      } else {
-        message("Building queries.")
-      }
+    # Widen the data frame if the user asked for that.
+    if (!tall_output["ground"]) {
+      current_output <- tidyr::pivot_wider(data = current_output,
+                                           names_from = "indicator",
+                                           values_from = "percent",
+                                           values_fill = 0)
     }
     
-    if (exact_match) {
-      queries <- paste0(base_url,
-                        current_table,
-                        "?",
-                        key_type,
-                        "=",
-                        keys_chunks)
+    # Can't hurt to ask for only distinct records, right?
+    outputs_list[["ground"]] <- dplyr::distinct(current_output)
+  }
+  
+  ##### Between-plant cover ----------------------------------------------------
+  if ("between plant" %in% indicator_families) {
+    current_lut <- dplyr::filter(.data = calc_lut,
+                                 cover_type == "between plant")
+    current_output <- values_list[[current_lut[["hit"]]]][[current_lut[["indicator_variables"]]]] |>
+      # Remove all layer codes that are >= 3 codes (i.e., species codes)
+      dplyr::filter(.data = _,
+                    stringi::stri_length(indicator) < 3)
+    
+    # Widen the data frame if the user asked for that.
+    if (!tall_output["between plant"]) {
+      current_output <- tidyr::pivot_wider(data = current_output,
+                                           names_from = "indicator",
+                                           values_from = "percent",
+                                           values_fill = 0)
+    }
+    
+    # Can't hurt to ask for only distinct records, right?
+    outputs_list[["between_plant"]] <- dplyr::distinct(current_output)
+  }
+  
+  ##### Bare soil --------------------------------------------------------------
+  if ("bare soil" %in% indicator_families) {
+    soil_codes <- c("S", "PC", "FG", "AG", "LM")
+    current_lut <- dplyr::filter(.data = calc_lut,
+                                 cover_type == "bare soil")
+    
+    current_output <- values_list[[current_lut[["hit"]]]][[current_lut[["indicator_variables"]]]] |>
+      # Keep only the soil code records
+      dplyr::filter(.data = _,
+                    indicator %in% soil_codes)
+    
+    # Widen the data frame if the user asked for that.
+    if (!tall_output["bare soil"]) {
+      current_output <- tidyr::pivot_wider(data = current_output,
+                                           names_from = "indicator",
+                                           values_from = "percent",
+                                           values_fill = 0)
+    }
+    
+    # Can't hurt to ask for only distinct records, right?
+    outputs_list[["bare_soil"]] <- dplyr::distinct(current_output)
+  }
+  
+  ##### Litter -----------------------------------------------------------------
+  if ("litter" %in% indicator_families) {
+    litter_codes <- c("L", "WL", "NL", "HL", "AM", "DN", "ER")
+    current_lut <- dplyr::filter(.data = calc_lut,
+                                 cover_type == "litter")
+    
+    current_output <- values_list[[current_lut[["hit"]]]][[current_lut[["indicator_variables"]]]] |>
+      # Keep only the litter code records
+      dplyr::filter(.data = _,
+                    indicator %in% litter_codes)
+    
+    # Widen the data frame if the user asked for that.
+    if (!tall_output["litter"]) {
+      current_output <- tidyr::pivot_wider(data = current_output,
+                                           names_from = "indicator",
+                                           values_from = "percent",
+                                           values_fill = 0)
+    }
+    
+    # Can't hurt to ask for only distinct records, right?
+    outputs_list[["litter"]] <- dplyr::distinct(current_output)
+  }
+  
+  ##### Live cover -------------------------------------------------------------
+  if ("live" %in% indicator_families) {
+    current_lut <- dplyr::filter(.data = calc_lut,
+                                 cover_type == "live")
+    
+    current_output <- values_list[[current_lut[["hit"]]]][[current_lut[["indicator_variables"]]]]
+    
+    if (!is.null(current_output)) {
+      # Keep only the records with "real" indicators (no NAs in the variables
+      # used to define the indicators)
+      current_output <- dplyr::filter(.data = current_output,
+                                      !stringr::str_detect(string = indicator,
+                                                           # pattern = "(((\\.)+)|((\\.NA)+)$)")) |>
+                                                           pattern = "((\\.)+$)|((\\.NA)+$)")) |>
+        # Replace the 1s and 0s with "Dead" and "Live"
+        dplyr::mutate(.data = _,
+                      indicator = stringr::str_replace_all(string = indicator,
+                                                           pattern = c("^1(\\.)?" = "Dead",
+                                                                       "^0(\\.)?" = "Live")))
+      
+      # Widen the data frame if the user asked for that.
+      if (!tall_output["live"]) {
+        current_output <- tidyr::pivot_wider(data = current_output,
+                                             names_from = "indicator",
+                                             values_from = "percent",
+                                             values_fill = 0)
+      }
+      
+      current_output <- dplyr::distinct(current_output)
     } else {
-      # This adds "Like" to the end of the variable name to do a search for a
-      # non-exact match. The object is still called "queries" even though it
-      # had better be a single string instead of a vector.
-      queries <- paste0(base_url,
-                        current_table,
-                        "?",
-                        key_type,
-                        "Like=",
-                        keys_chunks)
-    }
-  }
-  
-  # Use the queries to snag data
-  # This produces a list of results where each index in the list contains the
-  # results of one query.
-  # It uses a loop instead of a lapply() so that we can check if the token has
-  # expired each time we use it.
-  data_list <- list()
-  
-  for (current_query in queries) {
-    # The token might expire and need refreshing!
-    if (!is.null(token)) {
-      if (Sys.time() > token[["expiration_time"]]) {
-        if (verbose) {
-          message("Current API bearer authorization token has expired. Attempting to request a new one.")
-        }
-        if (!is.null(username) & !is.null(password)) {
-          token <- get_ldc_token(username = username,
-                                 password = password)
-        } else {
-          warning("The API bearer authorization token has expired. Because username and password have not been provided, only data which do not require a token will be retrieved.")
-          token <- NULL
-        }
+      if (verbose) {
+        message(paste0("No qualifying live/dead data for the hit type ", current_lut[["hit"]], ". These calculations will be skipped."))
       }
     }
     
-    # We handle things differently if the data type is header
-    # because the header table doesn't have an rid variable
-    # and we can't use take or cursor options without that
+    # Can't hurt to ask for only distinct records, right?
+    outputs_list[["live"]] <- current_output
+  }
+  
+  ##### Species cover ----------------------------------------------------------
+  if ("species" %in% indicator_families) {
+    current_lut <- dplyr::filter(.data = calc_lut,
+                                 cover_type == "species")
+    # output <- values_list[[which(names(iteration_vector) == current_lut[["hit"]])]][[current_lut[["indicator_variables"]]]] |>
+    current_output <- values_list[[current_lut[["hit"]]]][[current_lut[["indicator_variables"]]]] |>
+      # Remove all layer codes that are < 3 codes (i.e., non-species codes)
+      dplyr::filter(.data = _,
+                    stringi::stri_length(indicator) >= 3)
     
-    if (data_type == "header" | is.null(take)) {
-      if (verbose) {
-        message("Attempting to query LDC with:")
-        message(current_query)
-      }
-      
-      # Full query response using the token if we've got one.
-      if (is.null(token)) {
-        response <- httr::GET(url = current_query,
-                              httr::timeout(timeout),
-                              httr::user_agent(user_agent))
-        
-      } else {
-        response <- httr::GET(url = current_query,
-                              httr::timeout(timeout),
-                              httr::user_agent(user_agent),
-                              httr::add_headers(Authorization = paste("Bearer",
-                                                                      token[["IdToken"]])))
-        response <- httr::GET(url = current_query,
-                              httr::add_headers(Authorization = paste("Bearer",
-                                                                      token[["IdToken"]])))
-      }
-      # if (!is.null(username) & !is.null(password)) {
-      #   response <- httr::GET(current_query,
-      #                         config = list(httr::timeout(timeout),
-      #                                       httr::user_agent(user_agent),
-      #                                       httr::authenticate(user = username,
-      #                                                          password = password)))
-      # } else {
-      #   response <- httr::GET(current_query,
-      #                         config = list(httr::timeout(timeout),
-      #                                       httr::user_agent(user_agent)))
-      # }
-      
-      
-      # What if there's an error????
-      if (httr::http_error(response)) {
-        if (response$status_code == 500) {
-          stop(paste0("Query failed with status ",
-                      response$status_code,
-                      " which may be due to a very large number of records returned or attempting to query using a variable that doesn't occur in the requested data table. Consider setting the take argument to 10000 or less and consult https://api.landscapedatacommons.org/api-docs to see which variables are in which tables."))
-        } else {
-          stop(paste0("Query failed with status ",
-                      response$status_code))
-        }
-      }
-      
-      # Grab only the data portion
-      response_content <- response[["content"]]
-      # Convert from raw to character
-      content_character <- rawToChar(response_content)
-      # Convert from character to data frame
-      content_df <- jsonlite::fromJSON(content_character)
-      
-    } else {
-      # OKAY! So handling using take and cursor options for
-      # anything non-header
-      # The first query needs to not specify the cursor position
-      # and then after that we'll keep trying with the last
-      # rid value + 1 as the cursor until we get an empty
-      # response
-      if (verbose) {
-        message(paste0("Retrieving records in chunks of ", take))
-      }
-      
-      query <- paste0(current_query, "&take=", take)
-      
-      if (verbose) {
-        message("Attempting to query LDC with:")
-        message(query)
-      }
-      
-      # Querying with the token if we've got it.
-      if (is.null(token)) {
-        response <- httr::GET(url = query,
-                              httr::timeout(timeout),
-                              httr::user_agent(user_agent))
-        
-      } else {
-        response <- httr::GET(url = query,
-                              httr::timeout(timeout),
-                              httr::user_agent(user_agent),
-                              httr::add_headers(Authorization = paste("Bearer",
-                                                                      token[["IdToken"]])))
-      }
-      
-      # What if there's an error????
-      if (httr::http_error(response)) {
-        if (response$status_code == 500) {
-          stop(paste0("Query failed with status ",
-                      response$status_code,
-                      " which may be due to a very large number of records returned or attempting to query using a variable that doesn't occur in the requested data table. Consider setting the take argument to 10000 or less and consult https://api.landscapedatacommons.org/api-docs to see which variables are in which tables."))
-        } else {
-          stop(paste0("Query failed with status ",
-                      response$status_code))
-        }
-      }
-      
-      # Grab only the data portion
-      response_content <- response[["content"]]
-      # Convert from raw to character
-      content_character <- rawToChar(response_content)
-      # Convert from character to data frame
-      current_content_df <- jsonlite::fromJSON(content_character)
-      
-      content_df_list <- list(current_content_df)
-      
-      # Here's where we start iterating as long as we're still
-      # getting data
-      # So while the last returned response wasn't empty,
-      # keep requesting the next response where the cursor
-      # is set to the rid following the the highest rid in
-      # the last chunk
-      while (length(content_df_list[[length(content_df_list)]]) > 0) {
-        # And to avoid flooding the API server with requests,
-        # we'll put in a delay here.
-        # This gets the current time then spins its wheels,
-        # checking repeatedly to see if enough time has
-        # elapsed, at which point it moves on
-        start_time <- microbenchmark::get_nanotime()
-        repeat {
-          current_time <- microbenchmark::get_nanotime()
-          elapsed_time <- current_time - start_time
-          if (elapsed_time > delay) {
-            break
-          }
-        }
-        
-        
-        last_rid <- max(content_df_list[[length(content_df_list)]][["rid"]])
-        
-        query <- paste0(current_query, "&take=", take, "&cursor=", last_rid)
-        
-        if (verbose) {
-          message("Attempting to query LDC with:")
-          message(query)
-        }
-        
-        # The token might expire and need refreshing!
-        # This exists up above too, but we need it here in the while loop
-        # because we might be in the while for long enough for a token to expire
-        if (Sys.time() > token[["expiration_time"]]) {
-          if (verbose) {
-            message("Current API bearer authorization token has expired. Attempting to request a new one.")
-          }
-          if (!is.null(username) & !is.null(password)) {
-            token <- get_ldc_token(username = username,
-                                   password = password)
-          }
-        }
-        
-        # Querying with the token if we've got it.
-        if (is.null(token)) {
-          response <- httr::GET(url = query,
-                                httr::timeout(timeout),
-                                httr::user_agent(user_agent))
-          
-        } else {
-          response <- httr::GET(url = query,
-                                httr::timeout(timeout),
-                                httr::user_agent(user_agent),
-                                httr::add_headers(Authorization = paste("Bearer",
-                                                                        token[["IdToken"]])))
-        }
-        
-        # What if there's an error????
-        if (httr::http_error(response)) {
-          stop(paste0("Query failed with status ",
-                      response$status_code))
-        }
-        
-        # Grab only the data portion
-        response_content <- response[["content"]]
-        # Convert from raw to character
-        content_character <- rawToChar(response_content)
-        # Convert from character to data frame
-        current_content_df <- jsonlite::fromJSON(content_character)
-        
-        # Bind that onto the end of the list
-        # The data are wrapped in list() so that it gets added
-        # as a data frame instead of as a vector for each variable
-        content_df_list <- c(content_df_list, list(current_content_df))
-      }
-      content_df <- do.call(rbind,
-                            content_df_list)
-      
-      # And another delay for between individual queries
-      # that were generated by the key chunking instead of
-      # by take
-      start_time <- microbenchmark::get_nanotime()
-      repeat {
-        current_time <- microbenchmark::get_nanotime()
-        elapsed_time <- current_time - start_time
-        if (elapsed_time > delay) {
-          break
-        }
-      }
+    # Widen the data frame if the user asked for that.
+    if (!tall_output["species"]) {
+      current_output <- tidyr::pivot_wider(data = current_output,
+                                           names_from = "indicator",
+                                           values_from = "percent",
+                                           values_fill = 0)
     }
-    # Append whatever it is that we got back
-    data_list <- c(data_list, list(content_df))
+    
+    # Can't hurt to ask for only distinct records, right?
+    outputs_list[["species"]] <- dplyr::distinct(current_output)
   }
   
-  # Combine all the results of the queries
-  data <- do.call(rbind,
-                  data_list)
-  
-  # If there aren't data, let the user know
-  if (length(data) < 1) {
-    warning("No data retrieved. Confirm that your keys and key_type are correct.")
-    return(NULL)
-  } else {
-    # If there are data and the user gave keys, find which if any are missing
-    if (!is.null(keys) & exact_match) {
-      # Note that we're using keys_vector_original because even if we made
-      # alterations to keys_vector, the actual retrieved keys should match the
-      # original values despite substituting unicode references for illegal characters
-      missing_keys <- keys_vector_original[!(keys_vector_original %in% data[[key_type]])]
-      if (length(missing_keys) > 0) {
-        warning(paste0("The following keys were not associated with data: ",
-                       paste(missing_keys,
-                             collapse = ",")))
-      }
-    }
-    return(data)
-  }
-}
-
-#' Fetching data from the Landscape Data Commons using spatial constraints
-#' @description A function for retrieving data from the Landscape Data Commons which fall within a given set of polygons. This is accomplished by retrieving the header information for all points in the LDC, spatializing them, and finding the PrimaryKey values associated with points within the given polygons. Those PrimaryKey values are used to retrieve only the qualifying data from the LDC. Every time this function is called, it retrieves ALL header information via the API, which can be slow. If you plan to do multiple spatial queries back-to-back, it'll be faster to retrieve the headers with \code{\link[=fetch_ldc]{fetch_ldc()}} once, convert them to an sf object with \code{sf::st_as_sf()}, then use \code{sf:st_intersection()} repeatedly on that sf object to find the PrimaryKey values for each set of polygons and query the API using the PrimaryKeys.
-#' @param polygons Polygon sf object. The polygon or polygons describing the area to retrieve data from. Only records from sampling locations falling within this area will be returned.
-#' @param data_type Character string. The type of data to query. Note that the variable specified as \code{key_type} must appear in the table corresponding to \code{data_type}. Valid values are: \code{'gap'}, \code{'header'}, \code{'height'}, \code{'lpi'}, \code{'soilstability'}, \code{'speciesinventory'}, \code{'indicators'}, \code{'species'}, \code{'dustdeposition'}, \code{'horizontalflux'}, and \code{'schema'}.
-#' @param username Optional character string. The username to supply to the Landscape Data Commons API. Some data in the Landscape Data Commons are accessible only to users with appropriate credentials. You do not need to supply credentials, but an API request made without them may return fewer or no data. This argument will be ignored if \code{password} is \code{NULL}. Defaults to \code{NULL}.
-#' @param password Optional character string. The password to supply to the Landscape Data Commons API.  Some data in the Landscape Data Commons are accessible only to users with appropriate credentials. You do not need to supply credentials, but an API request made without them may return fewer or no data. This argument will be ignored if \code{username} is \code{NULL}. Defaults to \code{NULL}.
-#' @param key_chunk_size Numeric. The number of PrimaryKeys to send in a single query. Very long queries fail, so the keys may be chunked into smaller queries with the results of all the queries being combined into a single output. Defaults to \code{100}.
-#' @param timeout Numeric. The number of seconds to wait for a nonresponse from the API before considering the query to have failed. Defaults to \code{300}.
-#' @param take Optional numeric. The number of records to retrieve at a time. This is NOT the total number of records that will be retrieved! Queries that retrieve too many records at once can fail, so this allows the process to retrieve them in smaller chunks. The function will keep requesting records in chunks equal to this number until all matching records have been retrieved. If this value is too large (i.e., much greater than about \code{10000}), the server will likely respond with a 500 error. If \code{NULL} then all records will be retrieved in a single pass. Defaults to \code{NULL}.
-#' @param delay Optional numeric. The number of milliseconds to wait between API queries. Querying too quickly can crash an API or get you locked out, so adjust this as needed. Defaults to \code{500}.
-#' @param return_spatial Logical. If \code{TRUE} then the returned data will be an sf object. Otherwise if this is \code{FALSE} it will be a simple data frame. Defaults to \code{TRUE}.
-#' @param verbose Logical. If \code{TRUE} then the function will report additional diagnostic messages as it executes. Defaults to \code{FALSE}.
-#' @returns A data frame of records from the requested \code{data_type} which came from locations within \code{polygons}.
-#' @seealso
-#' * To query for data by key values, use \code{\link[=fetch_ldc]{fetch_ldc()}}.
-#' * To retrieve data by ecological site ID from a table that doesn't include ecological site ID use \code{\link[=fetch_ldc_ecosite]{fetch_ldc_ecosite()}}.
-#' @examples
-#' To retrieve all LPI records for sampling locations found within a given set of polygons provided as an sf object
-#' fetch_ldc_spatial(polygons = polygons_sf, data_type = "lpi")
-#' @export
-fetch_ldc_spatial <- function(polygons,
-                              data_type,
-                              token = NULL,
-                              username = NULL,
-                              password = NULL,
-                              key_chunk_size = 100,
-                              timeout = 300,
-                              take = NULL,
-                              delay =  500,
-                              return_spatial = TRUE,
-                              verbose = FALSE) {
-  if (!("sf" %in% class(polygons))) {
-    stop("polygons must be a polygon sf object")
-  }
-  
-  # Just to get a unique ID in there for sure without having to ask the user
-  polygons$unique_id <- 1:nrow(polygons)
-  
-  if (verbose) {
-    message("Fetching the header information from the LDC.")
-  }
-  headers_df <- fetch_ldc(data_type = "header",
-                          username = username,
-                          password = password)
-  
-  # We know that the header info includes coordinates in NAD83, so we can easily
-  # convert the data frame into an sf object
-  if (verbose) {
-    message("Converting header information into an sf point object.")
-  }
-  headers_sf <- sf::st_as_sf(x = headers_df,
-                             coords = c("Longitude_NAD83",
-                                        "Latitude_NAD83"),
-                             crs = "+proj=longlat +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +no_defs +type=crs")
-  
-  # We're just after the PrimaryKey values here
-  if (verbose) {
-    message("Finding points that fall within the polygons.")
-  }
-  header_polygons_intersection <- sf::st_intersection(x = headers_sf[, "PrimaryKey"],
-                                                      y = sf::st_transform(polygons[, "unique_id"],
-                                                                           crs = sf::st_crs(headers_sf)))
-  
-  # What if there're no qualifying data????
-  if (nrow(header_polygons_intersection) < 1) {
-    warning("No data were located within the given polygons.")
-    return(NULL)
-  }
-  
-  # If there were points found, snag the PrimaryKey values
-  intersected_primarykeys <- unique(header_polygons_intersection$PrimaryKey)
-  
-  # Grab only the data associated with the PrimaryKey values we've got
-  if (data_type == "header") {
-    output <- headers_sf[headers_sf$PrimaryKey %in% intersected_primarykeys, ]
-    if (!return_spatial) {
-      output <- sf::st_drop_geometry(output)
-    }
-  } else {
-    output <- fetch_ldc(keys = intersected_primarykeys,
-                        key_type = "PrimaryKey",
-                        data_type = data_type,
-                        token = token,
-                        username = username,
-                        password = password,
-                        key_chunk_size = key_chunk_size,
-                        timeout = timeout,
-                        exact_match = TRUE,
-                        delay = delay,
-                        verbose = verbose)
-    if (return_spatial) {
-      output <- dplyr::inner_join(x = dplyr::select(.data = headers_sf,
-                                                    PrimaryKey),
-                                  y = output)
-    }
-  }
-  
-  output
-}
-
-
-#' Fetching data from the Landscape Data Commons via API query using ecological site IDs
-#' @description This is a wrapper for \code{\link[=fetch_ldc]{fetch_ldc()}} which streamlines retrieving data by ecological site IDs.
-#' @param keys Character vector. All the ecological site IDs (e.g. \code{"R036XB006NM"}) to search for. The returned data will consist only of records where the designated ecological site ID matched one of these values, but there may be ecological site IDS that return no records.
-#' @param data_type Character string. The type of data to query. Valid values are: \code{'gap'}, \code{'header'}, \code{'height'}, \code{'lpi'}, \code{'soilstability'}, \code{'speciesinventory'}, \code{'indicators'}, \code{'species'}, \code{'dustdeposition'}, \code{'horizontalflux'}, and \code{'schema'}.
-#' @param username Optional character string. The username to supply to the Landscape Data Commons API. Some data in the Landscape Data Commons are accessible only to users with appropriate credentials. You do not need to supply credentials, but an API request made without them may return fewer or no data. This argument will be ignored if \code{password} is \code{NULL}. Defaults to \code{NULL}.
-#' @param password Optional character string. The password to supply to the Landscape Data Commons API.  Some data in the Landscape Data Commons are accessible only to users with appropriate credentials. You do not need to supply credentials, but an API request made without them may return fewer or no data. This argument will be ignored if \code{username} is \code{NULL}. Defaults to \code{NULL}.
-#' @param key_chunk_size Numeric. The number of keys to send in a single query. Very long queries fail, so the keys may be chunked into smaller queries with the results of all the queries being combined into a single output. Defaults to \code{100}.
-#' @param timeout Numeric. The number of seconds to wait for a nonresponse from the API before considering the query to have failed. Defaults to \code{300}.
-#' @param take Optional numeric. The number of records to retrieve at a time. This is NOT the total number of records that will be retrieved! Queries that retrieve too many records at once can fail, so this allows the process to retrieve them in smaller chunks. The function will keep requesting records in chunks equal to this number until all matching records have been retrieved. If this value is too large (i.e., much greater than about \code{10000}), the server will likely respond with a 500 error. If \code{NULL} then all records will be retrieved in a single pass. Defaults to \code{NULL}.
-#' @param delay Optional numeric. The number of milliseconds to wait between API queries. Querying too quickly can crash an API or get you locked out, so adjust this as needed. Defaults to \code{500}.
-#' @param exact_match Logical. If \code{TRUE} then only records for which the provided keys are an exact match will be returned. If \code{FALSE} then records containing (but not necessarily matching exactly) the first provided key value will be returned e.g. searching with \code{exact_match = FALSE}, \code{keys = "42"}, and \code{key_type = "EcologicalSiteID"} would return all records in which the ecological site ID contained the string \code{"42"} such as \code{"R042XB012NM"} or \code{"R036XB042NM"}. If \code{FALSE} only the first provided key value will be considered. Using non-exact matching will dramatically increase server response times, so use with caution. Defaults to \code{TRUE}.
-#' @param verbose Logical. If \code{TRUE} then the function will report additional diagnostic messages as it executes. Defaults to \code{FALSE}.
-#' @returns A data frame of records from the requested \code{data_type} which contain the values from \code{keys} in the variable \code{key_type}.
-#' @seealso
-#' * To query for data by key values, use \code{\link[=fetch_ldc]{fetch_ldc()}}.
-#' * To query for data by spatial location, use \code{\link[=fetch_ldc_spatial]{fetch_ldc_spatial()}}.
-#' @examples
-#' # To retrieve all LPI records associated with the ecological sites R036XB006NM and R036XB007NM
-#' fetch_ldc_ecosite(keys = c("R036XB006NM", "R036XB007NM"), data_type = "lpi")
-#' @export
-fetch_ldc_ecosite <- function(keys,
-                              data_type,
-                              token = NULL,
-                              username = NULL,
-                              password = NULL,
-                              key_chunk_size = 100,
-                              timeout = 300,
-                              take = NULL,
-                              delay = 500,
-                              exact_match = TRUE,
-                              verbose = FALSE) {
-  # First order of business: grab the header info for sampling locations that
-  # match the ecosite(s) requested
-  if (verbose) {
-    message("Retrieving header information")
-  }
-  current_headers <- fetch_ldc(keys = keys,
-                               key_type = "EcologicalSiteID",
-                               data_type = "header",
-                               token = token,
-                               username = username,
-                               password = password,
-                               key_chunk_size = key_chunk_size,
-                               timeout = timeout,
-                               take = NULL,
-                               delay = 500,
-                               exact_match = exact_match,
-                               verbose = verbose)
-  
-  # Okay, so what if we get no data?
-  # fetch_ldc() should already have warned the user, so we can just return NULL
-  # Or if they wanted the headers, we just serve those out
-  if (is.null(current_headers) | data_type == "header") {
-    return(current_headers)
-  }
-  
-  # Gimme those PrimaryKeys
-  current_primarykeys <- unique(current_headers$PrimaryKey)
-  
-  if (verbose) {
-    message("Retrieving requested data with relevant PrimaryKeys.")
-  }
-  # Grab the relevant data with the PrimaryKeys
-  fetch_ldc(keys = current_primarykeys,
-            key_type = "PrimaryKey",
-            data_type = data_type,
-            token = token,
-            username = username,
-            password = password,
-            key_chunk_size = key_chunk_size,
-            timeout = timeout,
-            take = take,
-            delay = delay,
-            exact_match = TRUE,
-            verbose = verbose)
-}
-
-# This is here because the implementation in terradactyl (as of 2024-10-17) is
-# inconvenient in how it handles grouping variables and forces grouping by
-# PrimaryKey and DBKey
-species_count <- function(data,
-                          species_var,
-                          grouping_vars,
-                          tall = TRUE) {
-  if (class(species_var) != "character" | length(species_var) != 1) {
-    stop("species_var must be a character string")
-  }
-  
-  if (class(grouping_vars) != "character") {
-    stop("grouping_vars must be a character vector")
-  }
-  
-  missing_variables <- setdiff(x = c(species_var,
-                                     grouping_variables),
-                               y = names(data))
-  if (length(missing_variables) > 0) {
-    stop(paste0("The following variables are missing from the data: ",
-                paste(missing_variables,
-                      collapse = ", ")))
-  }
-  
-  summary <- dplyr::summarize(.data = data,
-                              .by = grouping_variables,
-                              species_count = length(unique(species_var)))
-  
-  if (!tall) {
-    summary <- tidyr::pivot_wider(data = summary,
-                                  names_from = tidyselect::all_of(grouping_variables),
-                                  names_sep = "_",
-                                  values_from = species_count,
-                                  values_fill = 0)
-  }
-  
-  summary
+  #### Combining and cleanup ###################################################
+  outputs_list[!sapply(X = outputs_list,
+                       FUN = is.null)]
 }

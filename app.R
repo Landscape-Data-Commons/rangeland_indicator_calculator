@@ -2015,30 +2015,9 @@ server <- function(input, output, session) {
   ##### Grabbing the headers when asked ########################################
   observeEvent(eventExpr = req(input$get_headers),
                handlerExpr = {
-                 message("The get headers button was pressed.")
-                 # if (req(!identical(input$ldc_credentials_email, workspace[["username"]]))) {
-                 # message("LDC username updated")
-                 workspace[["username"]] <- input$ldc_credentials_email
-                 if (workspace[["username"]] == "") {
-                   workspace[["username"]] <- NULL
-                 }
-                 # }
-                 message(paste("workspace$username is:", workspace[["username"]]))
-                 
-                 # if (req(!identical(input$ldc_credentials_password, workspace[["password"]]))) {
-                 # message("LDC password updated")
-                 workspace[["password"]] <- input$ldc_credentials_password
-                 if (workspace[["password"]] == "") {
-                   workspace[["password"]] <- NULL
-                 }
-                 # }
-                 message(paste("workspace$password is:", workspace[["password"]]))
                  
                  message("Headers requested to populate the map")
                  current_headers <- tryCatch(fetch_ldc(data_type = "header",
-                                                       username = workspace[["username"]],
-                                                       password = workspace[["password"]],
-                                                       token = workspace[["token"]],
                                                        verbose = TRUE),
                                              error = function(error){
                                                gsub(x = error,

@@ -39,7 +39,7 @@ ui <- fluidPage(
   ),
   navbarPage(
     title = tags$div(class = "tool-title",
-                     "Rangeland Indicator Calculator"),
+                     "Grazing Lands Indicator Calculator"),
     id = "navbar-full",
     position = "static-top",
     footer = tags$div(class = "footer",

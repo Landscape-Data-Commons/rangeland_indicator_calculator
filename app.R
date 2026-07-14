@@ -7,6 +7,8 @@ library(leaflet)
 library(leaflet.extras)
 library(sf)
 library(shinyjs)
+library(trex)
+library(terradactyl)
 source("functions.R")
 
 # Define UI for application

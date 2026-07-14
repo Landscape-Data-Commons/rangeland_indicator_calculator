@@ -206,18 +206,16 @@ ui <- fluidPage(
                  # never coexist.
                  tags$div(id = "fetch_and_busy_container",
                           tags$div(id = "fetch_button_container",
-                                   HTML("<center>"),
-                                   uiOutput("fetch_ui"),
-                                   HTML("</center>"),
+                                   
                                    # HTML("<center>"),
                                    # uiOutput("fetch_ui1"),
                                    # HTML("</center>"),
-                                   # HTML("<center>"),
-                                   # uiOutput("fetch_ui2"),
-                                   # HTML("</center>"),
-                                   # HTML("<center>"),
-                                   # uiOutput("fetch_ui3"),
-                                   # HTML("</center>"),
+                                   HTML("<center>"),
+                                   uiOutput("fetch_ui2"),
+                                   HTML("</center>"),
+                                   HTML("<center>"),
+                                   uiOutput("fetch_ui3"),
+                                   HTML("</center>"),
                                    uiOutput("data_available_ui")
                           ),
                           conditionalPanel(
@@ -1116,79 +1114,79 @@ server <- function(input, output, session) {
                        "Please use the buttons found on the left side of the map to draw your polygon boundary."))
   })
   
-  observeEvent(eventExpr = list(input$query_method,
-                                input$keys,
-                                input$ldc_no_credentials_confirmation,
-                                input$ldc_credentials_email,
-                                input$ldc_credentials_password,
-                                input$polygon_source,
-                                input$polygons_layer,
-                                workspace$drawn_polygon_sf),
-               handlerExpr = {
-                 message("Considering whether to render the fetch button.")
-                 
-                 if (req(input$query_method) %in% c("EcologicalSiteID", "PrimaryKey", "ProjectKey")) {
-                   message(paste0("query_method is ", input$query_method))
-                   if (req(input$keys) != "") {
-                     message(paste0("keys is ", input$keys))
-                     fetch_ready <- TRUE
-                   } else {
-                     message("No valid keys value. Holding off on rendering the fetch button.")
-                     fetch_ready <- FALSE
-                   }
-                 } else {
-                   message("stupid")
-                 }
-                 message("Still considering whether to render the fetch button.")
-                 if (req(input$query_method) == "spatial") {
-                   message(paste0("query_method is ", input$query_method))
-                   if (req(input$polygon_source) == "upload" & req(input$polygons_layer) != "") {
-                     message(paste0("The polygon_source is 'upload' and polygons_layer is ",
-                                    input$polygons_layer))
-                     fetch_ready <- TRUE
-                   } else if (req(input$polygon_source) == "draw" & !is.null(req(workspace$drawn_polygon_sf))) {
-                     message("The polygon_source is 'draw' and drawn_polygon_sf is not NULL.")
-                     fetch_ready <- TRUE
-                   } else {
-                     fetch_ready <- FALSE
-                   }
-                 } else {
-                   message("still stupid")
-                 }
-                 message(paste0("fetch_ready is ", fetch_ready))
-                 if (fetch_ready) {
-                   message("Checking out credential situation.")
-                   
-                   if (req(input$data_source) %in% c("ldc")) {
-                     message("The user wants to query for sure. Evaluating to see if credentials look good enough.")
-                     if (req(input$ldc_no_credentials_confirmation)) {
-                       message("No credentials provided. Rendering fetch button.")
-                       output$fetch_ui <- renderUI(expr = tagList(br(),
-                                                                  actionButton(inputId = "fetch_data",
-                                                                               label = "Fetch data")))
-                     } else {
-                       # These are obviously not stringent, but I'm also unclear
-                       # on if the username will always be an email address so
-                       # this is just covering other cases instead of requiring
-                       # a true email format.
-                       has_vaid_looking_email <-  nchar(input$ldc_credentials_email) > 4
-                       has_valid_looking_password <- nchar(input$ldc_credentials_password) > 0
-                       if (has_valid_looking_email & has_valid_looking_password) {
-                         message("Credentials look valid enough to render the fetch button. Rendering now.")
-                         output$fetch_ui <- renderUI(expr = tagList(br(),
-                                                                    actionButton(inputId = "fetch_data",
-                                                                                 label = "Fetch data")))
-                       } else {
-                         message("Credentials don't look valid enough to render the fetch button. Skipping rendering for now.")
-                         output$fetch_ui <- NULL
-                       }
-                     }
-                   } else {
-                     message("Data are going to be uploaded. No need to check credentials or render the fetch button.")
-                     output$fetch_ui <- NULL
-                   }
-                 }
-               })
+  # observeEvent(eventExpr = list(input$query_method,
+  #                               input$keys,
+  #                               input$ldc_no_credentials_confirmation,
+  #                               input$ldc_credentials_email,
+  #                               input$ldc_credentials_password,
+  #                               input$polygon_source,
+  #                               input$polygons_layer,
+  #                               workspace$drawn_polygon_sf),
+  #              handlerExpr = {
+  #                message("Considering whether to render the fetch button.")
+  #                
+  #                if (req(input$query_method) %in% c("EcologicalSiteID", "PrimaryKey", "ProjectKey")) {
+  #                  message(paste0("query_method is ", input$query_method))
+  #                  if (req(input$keys) != "") {
+  #                    message(paste0("keys is ", input$keys))
+  #                    fetch_ready <- TRUE
+  #                  } else {
+  #                    message("No valid keys value. Holding off on rendering the fetch button.")
+  #                    fetch_ready <- FALSE
+  #                  }
+  #                } else {
+  #                  message("stupid")
+  #                }
+  #                message("Still considering whether to render the fetch button.")
+  #                if (req(input$query_method) == "spatial") {
+  #                  message(paste0("query_method is ", input$query_method))
+  #                  if (req(input$polygon_source) == "upload" & req(input$polygons_layer) != "") {
+  #                    message(paste0("The polygon_source is 'upload' and polygons_layer is ",
+  #                                   input$polygons_layer))
+  #                    fetch_ready <- TRUE
+  #                  } else if (req(input$polygon_source) == "draw" & !is.null(req(workspace$drawn_polygon_sf))) {
+  #                    message("The polygon_source is 'draw' and drawn_polygon_sf is not NULL.")
+  #                    fetch_ready <- TRUE
+  #                  } else {
+  #                    fetch_ready <- FALSE
+  #                  }
+  #                } else {
+  #                  message("still stupid")
+  #                }
+  #                message(paste0("fetch_ready is ", fetch_ready))
+  #                if (fetch_ready) {
+  #                  message("Checking out credential situation.")
+  #                  
+  #                  if (req(input$data_source) %in% c("ldc")) {
+  #                    message("The user wants to query for sure. Evaluating to see if credentials look good enough.")
+  #                    if (req(input$ldc_no_credentials_confirmation)) {
+  #                      message("No credentials provided. Rendering fetch button.")
+  #                      output$fetch_ui <- renderUI(expr = tagList(br(),
+  #                                                                 actionButton(inputId = "fetch_data",
+  #                                                                              label = "Fetch data")))
+  #                    } else {
+  #                      # These are obviously not stringent, but I'm also unclear
+  #                      # on if the username will always be an email address so
+  #                      # this is just covering other cases instead of requiring
+  #                      # a true email format.
+  #                      has_vaid_looking_email <-  nchar(input$ldc_credentials_email) > 4
+  #                      has_valid_looking_password <- nchar(input$ldc_credentials_password) > 0
+  #                      if (has_valid_looking_email & has_valid_looking_password) {
+  #                        message("Credentials look valid enough to render the fetch button. Rendering now.")
+  #                        output$fetch_ui <- renderUI(expr = tagList(br(),
+  #                                                                   actionButton(inputId = "fetch_data",
+  #                                                                                label = "Fetch data")))
+  #                      } else {
+  #                        message("Credentials don't look valid enough to render the fetch button. Skipping rendering for now.")
+  #                        output$fetch_ui <- NULL
+  #                      }
+  #                    }
+  #                  } else {
+  #                    message("Data are going to be uploaded. No need to check credentials or render the fetch button.")
+  #                    output$fetch_ui <- NULL
+  #                  }
+  #                }
+  #              })
   
   # Add a fetch button when grabbing data from the LDC and the query criteria
   # are available

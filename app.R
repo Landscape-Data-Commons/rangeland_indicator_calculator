@@ -139,14 +139,14 @@ ui <- fluidPage(
                  ),
                  # If the data are coming from the LDC, offer the chance to use
                  # credentials
-                 fluidRow(column(width = 10,
-                                 uiOutput("ldc_no_credentials_ui"))),
-                 fluidRow(column(width = 10,
-                                 uiOutput("ldc_get_credentials_ui"))),
-                 fluidRow(column(width = 10,
-                                 uiOutput("ldc_credentials_ui")),
-                          column(width = 1,
-                                 uiOutput("ldc_credentials_info_ui"))),
+                 # fluidRow(column(width = 10,
+                 #                 uiOutput("ldc_no_credentials_ui"))),
+                 # fluidRow(column(width = 10,
+                 #                 uiOutput("ldc_get_credentials_ui"))),
+                 # fluidRow(column(width = 10,
+                 #                 uiOutput("ldc_credentials_ui")),
+                 #          column(width = 1,
+                 #                 uiOutput("ldc_credentials_info_ui"))),
                  # If the data are going to come from the LDC, give the option
                  # to display all current data locations
                  br(),
@@ -1090,39 +1090,41 @@ server <- function(input, output, session) {
   # at the same time, I can't capture them both in a single conditional, but I
   # can do it in two separate ones rendering an identical element because I know
   # they'll never come into conflict
-  output$fetch_ui1 <- renderUI(expr = if (req(input$query_method %in% c("EcologicalSiteID", "PrimaryKey", "ProjectKey") & input$keys != "")) {
-    message("Checking to see if it's time to render the fetch button.")
-    # if (input$ldc_no_credentials_confirmation) {
-    #   message("No need for credentials. Rendering fetch button.")
-    #   tagList(br(),
-    #           actionButton(inputId = "fetch_data",
-    #                        label = "Fetch data"))
-    # } else if (nchar(input$ldc_credentials_email) > 4 & nchar(input$ldc_credentials_password) > 0) {
-    #   message("Credentials available to try. Rendering fetch button.")
-    #   tagList(br(),
-    #           actionButton(inputId = "fetch_data",
-    #                        label = "Fetch data"))
-    # }
-    if (input$ldc_no_credentials_confirmation | req(nchar(input$ldc_credentials_email) > 4 & nchar(input$ldc_credentials_password) > 0)) {
-      message("Credentials situation workable. Rendering fetch button.")
-      tagList(br(),
-              actionButton(inputId = "fetch_data",
-                           label = "Fetch data"))
-    }
-  })
+  # output$fetch_ui1 <- renderUI(expr = if (req(input$query_method %in% c("EcologicalSiteID", "PrimaryKey", "ProjectKey") & input$keys != "")) {
+  #   message("Checking to see if it's time to render the fetch button.")
+  #   # if (input$ldc_no_credentials_confirmation) {
+  #   #   message("No need for credentials. Rendering fetch button.")
+  #   #   tagList(br(),
+  #   #           actionButton(inputId = "fetch_data",
+  #   #                        label = "Fetch data"))
+  #   # } else if (nchar(input$ldc_credentials_email) > 4 & nchar(input$ldc_credentials_password) > 0) {
+  #   #   message("Credentials available to try. Rendering fetch button.")
+  #   #   tagList(br(),
+  #   #           actionButton(inputId = "fetch_data",
+  #   #                        label = "Fetch data"))
+  #   # }
+  #   if (req(input$ldc_no_credentials_confirmation) | req(nchar(input$ldc_credentials_email) > 4 & nchar(input$ldc_credentials_password) > 0)) {
+  #     message("Credentials situation workable. Rendering fetch button.")
+  #     tagList(br(),
+  #             actionButton(inputId = "fetch_data",
+  #                          label = "Fetch data"))
+  #   }
+  # })
   output$fetch_ui2 <- renderUI(expr = if (req(input$query_method == "spatial" & (input$polygon_source == "upload" & input$polygons_layer != ""))) {
-    if (req(input$ldc_no_credentials_confirmation) | (req(nchar(input$ldc_credentials_email) > 4 & nchar(input$ldc_credentials_password) > 0))) {
-      tagList(br(),
-              actionButton(inputId = "fetch_data",
-                           label = "Fetch data"))
-    }
+    message("Rendering fetch_ui2")
+    # if (req(input$ldc_no_credentials_confirmation) | (req(nchar(input$ldc_credentials_email) > 4 & nchar(input$ldc_credentials_password) > 0))) {
+    tagList(br(),
+            actionButton(inputId = "fetch_data",
+                         label = "Fetch data"))
+    # }
   })
   output$fetch_ui3 <- renderUI(expr = if (req(input$query_method == "spatial" & input$polygon_source == "draw" & !is.null(workspace$drawn_polygon_sf))) {
-    if (req(input$ldc_no_credentials_confirmation | (nchar(input$ldc_credentials_email) > 4 & nchar(input$ldc_credentials_password) > 0))) {
-      tagList(br(),
-              actionButton(inputId = "fetch_data",
-                           label = "Fetch data"))
-    }
+    message("Rendering fetch_ui3")
+    # if (req(input$ldc_no_credentials_confirmation | (nchar(input$ldc_credentials_email) > 4 & nchar(input$ldc_credentials_password) > 0))) {
+    tagList(br(),
+            actionButton(inputId = "fetch_data",
+                         label = "Fetch data"))
+    # }
   })
   
   # Building the links to other tabs!
@@ -2541,71 +2543,7 @@ server <- function(input, output, session) {
                  workspace$current_data_source <- "ldc"
                  message("Data source set to LDC")
                  
-                 # Gotta handle API token stuff now.
-                 if (as.logical(input$ldc_no_credentials_confirmation)) {
-                   # Nullify any token we have right now if the user doesn't
-                   # want to use credentials.
-                   message("User has declined to use LDC credentials. Making sure token is NULL.")
-                   workspace[["token"]] <- NULL
-                 } else {
-                   message("Attempting to use the provided LDC credentials.")
-                   # if (req(!identical(input$ldc_credentials_email, workspace[["username"]]))) {
-                   #   message("LDC username updated")
-                     workspace[["username"]] <- input$ldc_credentials_email
-                     if (workspace[["username"]] == "") {
-                       workspace[["username"]] <- NULL
-                     }
-                     message(paste("workspace$username is:", workspace[["username"]]))
-                   # }
-                   # if (req(!identical(input$ldc_credentials_password, workspace[["password"]]))) {
-                   #   message("LDC password updated")
-                     workspace[["password"]] <- input$ldc_credentials_password
-                     if (workspace[["password"]] == "") {
-                       workspace[["password"]] <- NULL
-                     }
-                     message(paste("workspace$password is:", workspace[["password"]]))
-                   # }
-                   
-                   # Provided we want a token, try to make that happen.
-                   if (is.null(workspace[["token"]])) {
-                     message("No token available right now. Grabbing a new one.")
-                     current_token <- tryCatch(expr = get_ldc_token(username = workspace[["username"]],
-                                                                    password = workspace[["password"]]),
-                                               error = function(error){
-                                                 gsub(x = error,
-                                                      pattern = "^Error.+[ ]:[ ]",
-                                                      replacement = "") 
-                                               })
-                   } else {
-                     if (workspace[["token"]][["expiration_time"]] > Sys.time()) {
-                       message("The token is expired. Attempting to grab a new one.")
-                       current_token <- tryCatch(expr = get_ldc_token(username = workspace[["username"]],
-                                                                      password = workspace[["password"]]),
-                                                 error = function(error){
-                                                   gsub(x = error,
-                                                        pattern = "^Error.+[ ]:[ ]",
-                                                        replacement = "") 
-                                                 })
-                     }
-                   }
-                   message(paste("Class of current_token is",
-                                 paste(class(current_token),
-                                       collapse = ", ")))
-                   if (identical(class(current_token), "character")) {
-                     message("Token is invalid. Reporting error.")
-                     showNotification(ui = paste("There was an error using the supplied credentials:",
-                                                 stringr::str_extract(string = current_token,
-                                                                      pattern = "(?<=Error in AWS Lambda function: ).+$"),
-                                                 "Only data which do not require credentials will be returned."),
-                                      duration = NULL,
-                                      closeButton = TRUE,
-                                      type = "error",
-                                      id = "token_error")
-                     workspace[["token"]] <- NULL
-                   } else {
-                     workspace[["token"]] <- current_token
-                   }
-                 }
+                 
                  
                  if (input$query_method != "spatial") {
                    message("Nullifying workspace$mapping_polygons for mapping reasons")
@@ -2613,271 +2551,22 @@ server <- function(input, output, session) {
                    message("Querying by keys")
                    # Only do anything if there's at least one key
                    if (input$keys != "") {
-                     message("Converting keys to a vector.")
-                     # Handle multiple requested ecosites at once!
-                     current_key_vector <- stringr::str_split(string = input$keys,
-                                                              pattern = ",",
-                                                              simplify = TRUE)
-                     
-                     # This will make it easy to check to see if any of these values
-                     # weren't associated with data
-                     current_key_vector <- trimws(current_key_vector)
-                     
-                     # fetch_ldc() can take a vector (slow, retrieves one at a time)
-                     # or a string of values separated by commas (fast, retrieves all at once)
-                     current_key_string <- paste(current_key_vector,
-                                                 collapse = ",")
-                     
-                     
-                     # The API queryable tables don't include ecosite, so we grab
-                     # the header table and get primary keys from that
-                     if (input$query_method == "EcologicalSiteID") {
-                       message("key_type is EcologicalSiteID")
-                       message("Retrieving headers")
-                       current_headers <- tryCatch(fetch_ldc(keys = current_key_string,
-                                                             key_type = input$query_method,
-                                                             data_type = "header",
-                                                             username = workspace[["username"]],
-                                                             password = workspace[["password"]],
-                                                             token = workspace[["token"]],
-                                                             verbose = TRUE),
-                                                   error = function(error){
-                                                     gsub(x = error,
-                                                          pattern = "^Error.+[ ]:[ ]",
-                                                          replacement = "")
-                                                   })
-                       
-                       message(paste0("class(current_headers) is ",
-                                      paste(class(current_headers),
-                                            collapse = ", ")))
-                       if (is.null(current_headers)) {
-                         message("class(current_headers) is NULL. Setting results to NULL")
-                         # showNotification(ui = "Unfortunately something went wrong retrieving the data from the Landscape Data Commons.",
-                         #                  duration = NULL,
-                         #                  closeButton = TRUE,
-                         #                  type = "error",
-                         #                  id = "unknown_headers_error")
-                         results <- NULL
-                       } else if ("character" %in% class(current_headers)) {
-                         results <- NULL
-                       } else {
-                         current_headers_sf <- sf::st_as_sf(x = current_headers,
-                                                            coords = c("Longitude_NAD83",
-                                                                       "Latitude_NAD83"),
-                                                            crs = "+proj=longlat +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +no_defs +type=crs")
-                         
-                         # This'll be useful so I can make a map
-                         workspace$mapping_header_sf <- current_headers_sf
-                         current_primary_keys <- current_headers$PrimaryKey
-                         
-                         # current_key_chunk_count <- ceiling(length(current_primary_keys) / 100)
-                         # 
-                         # current_primary_keys <- sapply(X = 1:current_key_chunk_count,
-                         #                                keys_vector = current_primary_keys,
-                         #                                key_chunk_size = 100,
-                         #                                key_count = length(current_primary_keys),
-                         #                                FUN = function(X, keys_vector, key_chunk_size, key_count) {
-                         #                                  min_index <- max(c(1, (X - 1) * key_chunk_size + 1))
-                         #                                  max_index <- min(c(key_count, X * key_chunk_size))
-                         #                                  indices <- min_index:max_index
-                         #                                  paste(keys_vector[indices],
-                         #                                        collapse = ",")
-                         #                                })
-                         
-                         message("Retrieving data using PrimaryKey values from headers")
-                         results <- tryCatch(fetch_ldc(keys = current_primary_keys,
-                                                       key_type = "PrimaryKey",
-                                                       data_type = input$data_type,
-                                                       username = workspace[["username"]],
-                                                       password = workspace[["password"]],
-                                                       token = workspace[["token"]],
-                                                       verbose = TRUE),
-                                             error = function(error){
-                                               gsub(x = error,
-                                                    pattern = "^Error.+[ ]:[ ]",
-                                                    replacement = "")
-                                             })
-                       }
-                     } else {
-                       message("key_type is not EcologicalSiteID")
-                       message("Retrieving data using provided keys")
-                       current_key_chunk_count <- ceiling(length(current_key_vector) / 100)
-                       
-                       current_keys_chunks <- sapply(X = 1:current_key_chunk_count,
-                                                     keys_vector = current_key_vector,
-                                                     key_chunk_size = 100,
-                                                     key_count = length(current_key_vector),
-                                                     FUN = function(X, keys_vector, key_chunk_size, key_count) {
-                                                       min_index <- max(c(1, (X - 1) * key_chunk_size + 1))
-                                                       max_index <- min(c(key_count, X * key_chunk_size))
-                                                       indices <- min_index:max_index
-                                                       paste(keys_vector[indices],
-                                                             collapse = ",")
-                                                     })
-                       
-                       results <- tryCatch(fetch_ldc(keys = current_keys_chunks,
-                                                     key_type = input$query_method,
-                                                     data_type = input$data_type,
-                                                     username = workspace[["username"]],
-                                                     password = workspace[["password"]],
-                                                     token = workspace[["token"]],
-                                                     verbose = TRUE),
-                                           error = function(error){
-                                             gsub(x = error,
-                                                  pattern = "^Error.+[ ]:[ ]",
-                                                  replacement = "")
-                                           })
-                     }
-                   }
-                   
-                   # So we can tell the user later which actually got queried
-                   if (is.null(results)) {
-                     message("No data from LDC!")
-                     workspace$missing_keys <- current_key_vector
-                     showNotification(ui = "No data were found associated with your keys.",
-                                      duration = NULL,
-                                      closeButton = TRUE,
-                                      type = "warning",
-                                      id = "no_data_returned_warning")
-                   } else if ("character" %in% class(results)) {
-                     # If results is actually an error message, display it
-                     showNotification(ui = results,
-                                      duration = NULL,
-                                      closeButton = TRUE,
-                                      type = "error",
-                                      id = "api_error")
-                     workspace$missing_keys <- NULL
+                     message("Retrieving data using provided keys")
+                     results <- tryCatch(fetch_ldc(data_type = input$data_type,
+                                                   query_parameters = list(list("in" = input$keys)) |>
+                                                     setNames(object = _,
+                                                              nm = input$query_method),
+                                                   multi_table_queries = TRUE,
+                                                   verbose = TRUE),
+                                         error = function(error){
+                                           gsub(x = error,
+                                                pattern = "^Error.+[ ]:[ ]",
+                                                replacement = "")
+                                         })
                    } else {
-                     # Let's get map info!
-                     message("Getting current headers for mapping")
-                     current_primarykeys <- unique(results$PrimaryKey)
-                     current_primarykey_chunk_count <- ceiling(length(current_key_vector) / 100)
-                     
-                     current_primarykeys_chunks <- sapply(X = 1:current_primarykey_chunk_count,
-                                                          keys_vector = current_primarykeys,
-                                                          key_chunk_size = 100,
-                                                          key_count = length(current_primarykeys),
-                                                          FUN = function(X, keys_vector, key_chunk_size, key_count) {
-                                                            min_index <- max(c(1, (X - 1) * key_chunk_size + 1))
-                                                            max_index <- min(c(key_count, X * key_chunk_size))
-                                                            indices <- min_index:max_index
-                                                            paste(keys_vector[indices],
-                                                                  collapse = ",")
-                                                          })
-                     message("Actually fetching current headers based on PrimaryKeys")
-                     current_headers <- tryCatch(fetch_ldc(keys = current_primarykeys_chunks,
-                                                           key_type = "PrimaryKey",
-                                                           data_type = "header",
-                                                           username = workspace[["username"]],
-                                                           password = workspace[["password"]],
-                                                           token = workspace[["token"]],
-                                                           verbose = TRUE),
-                                                 error = function(error){
-                                                   gsub(x = error,
-                                                        pattern = "^Error.+[ ]:[ ]",
-                                                        replacement = "")
-                                                 })
-                     
-                     message(paste0("class(current_headers) is: ",
-                                    paste(class(current_headers),
-                                          collapse = ", ")))
-                     if (is.null(current_headers)) {
-                       showNotification(ui = paste0("No matching data were found in the Landscape Data Commons."),
-                                        duration = NULL,
-                                        closeButton = TRUE,
-                                        type = "error",
-                                        id = "api_headers_error")
-                       workspace$mapping_header_sf <- NULL
-                     } else {
-                       if ("character" %in% class(current_headers)) {
-                         showNotification(ui = paste0("Encountered the following API error retrieving header info for mapping: ",
-                                                      current_headers),
-                                          duration = NULL,
-                                          closeButton = TRUE,
-                                          type = "error",
-                                          id = "api_headers_error")
-                         workspace$mapping_header_sf <- NULL
-                       } else if ("data.frame" %in% class(current_headers)) {
-                         message("Converting header info to sf object")
-                         current_headers_sf <- sf::st_as_sf(x = current_headers,
-                                                            coords = c("Longitude_NAD83",
-                                                                       "Latitude_NAD83"),
-                                                            crs = "+proj=longlat +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +no_defs +type=crs")
-                         
-                         # This'll be useful so I can make a map
-                         workspace$mapping_header_sf <- current_headers_sf
-                       }
-                     }
-                     
-                     
-                     message("Determining if keys are missing.")
-                     message(paste0("input$query_method is: ",
-                                    paste(input$query_method,
-                                          collapse = ", ")))
-                     # Because ecosites were two-stage, we check in with headers
-                     if (input$query_method %in% c("EcologicalSiteID")) {
-                       workspace$queried_keys <- unique(current_headers[[input$query_method]])
-                     } else {
-                       workspace$queried_keys <- unique(results[[input$query_method]])
-                     }
-                     
-                     workspace$missing_keys <- current_key_vector[!(current_key_vector %in% workspace$queried_keys)]
+                     results <- NULL
                    }
                    
-                   message("Determining if workspace$missing_keys has length > 0")
-                   if (length(workspace$missing_keys) > 0) {
-                     message(paste0("The following key values are missing: ",
-                                    paste(workspace$missing_keys,
-                                          collapse = ", ")))
-                     key_error <- paste0("The following keys did not have data associated with them: ",
-                                         paste(workspace$missing_keys,
-                                               collapse = ", "))
-                     showNotification(ui = key_error,
-                                      duration = NULL,
-                                      closeButton = TRUE,
-                                      type = "warning",
-                                      id = "key_error")
-                   } else {
-                     message("No missing keys!")
-                   }
-                   
-                   
-                   # Only keep going if there are results!!!!
-                   if (length(results) > 0 & "data.frame" %in% class(results)) {
-                     message("Coercing variables to numeric.")
-                     # Convert from character to numeric variables where possible
-                     data_corrected <- lapply(X = names(results),
-                                              data = results,
-                                              FUN = function(X, data){
-                                                # Get the current variable values as a vector
-                                                vector <- data[[X]]
-                                                # Try to coerce into numeric
-                                                numeric_vector <- as.numeric(vector)
-                                                # If that works without introducing NAs, return the numeric vector
-                                                # Otherwise, return the original character vector
-                                                if (all(!is.na(numeric_vector))) {
-                                                  return(numeric_vector)
-                                                } else {
-                                                  return(vector)
-                                                }
-                                              })
-                     
-                     # From some reason co.call(cbind, data_corrected) was returning a list not a data frame
-                     # so I'm resorting to using dplyr
-                     data <- dplyr::bind_cols(data_corrected)
-                     # Correct the names of the variables
-                     names(data) <- names(results)
-                     
-                     # Put it in the workspace list
-                     message("Setting data_fresh to TRUE because we just downloaded it")
-                     workspace$data_fresh <- TRUE
-                     workspace$raw_data <- data
-                   } else {
-                     workspace$raw_data <- NULL
-                   }
-                   
-                   message("Data are from the LDC and include header info. Setting workspace$headers to NULL.")
-                   workspace$headers <- NULL
                    
                  } else if (input$query_method == "spatial") {
                    message("Spatial query time!")
@@ -2926,166 +2615,92 @@ server <- function(input, output, session) {
                    message("Updating workspace$mapping_polygons")
                    workspace$mapping_polygons <- workspace$polygons
                    
-                   if (is.null(workspace$headers)) {
-                     message("Retrieving headers")
-                     workspace$headers <- tryCatch(fetch_ldc(keys = NULL,
-                                                             key_type = NULL,
-                                                             data_type = "header",
-                                                             username = workspace[["username"]],
-                                                             password = workspace[["password"]],
-                                                             token = workspace[["token"]],
+                   message("Retrieving data")
+                   results <- tryCatch(fetch_ldc_spatial(polygons = workspace$polygons,
+                                                         data_type = input$data_type,
+                                                         return_spatial = FALSE,
+                                                         verbose = TRUE),
+                                       error = function(error){
+                                         gsub(x = error,
+                                              pattern = "^Error.+[ ]:[ ]",
+                                              replacement = "")
+                                       })
+                 }
+                 
+                 if (is.null(results)) {
+                   showNotification(ui = switch(input$query_method,
+                                                "spatial" = "No sampling locations were found within your polygons.",
+                                                "No data were found associated with your keys."),
+                                    duration = NULL,
+                                    closeButton = TRUE,
+                                    id = "no_data_returned_error",
+                                    type = "error")
+                   workspace$header_sf <-
+                     workspace$mapping_header_sf <- NULL
+                 } else {
+                   if (length(results) > 0 & "data.frame" %in% class(results)) {
+                     # Put it in the workspace list
+                     message("Setting data_fresh to TRUE because we just downloaded it")
+                     workspace$data_fresh <- TRUE
+                     workspace$raw_data <- results
+                     
+                     # So we can tell the user later which actually got queried
+                     if (!is.null(results) & !is.character(results)) {
+                       # Let's get map info!
+                       message("Getting current headers for mapping")
+                       message("Actually fetching current headers based on PrimaryKeys")
+                       current_headers <- tryCatch(fetch_ldc(data_type = "header",
+                                                             query_parameters = list(PrimaryKey = list("in" = unique(results$PrimaryKey))),
                                                              verbose = TRUE),
                                                    error = function(error){
                                                      gsub(x = error,
                                                           pattern = "^Error.+[ ]:[ ]",
                                                           replacement = "")
                                                    })
-                     message(paste0("class(workspace$headers) is ",
-                                    paste(class(workspace$headers),
-                                          collapse = ", ")))
-                   }
-                   
-                   current_headers <- workspace$headers
-                   
-                   if (is.null(current_headers)) {
-                     results <- NULL
-                     showNotification(ui = paste0("No matching data were found in the Landscape Data Commons."),
-                                      duration = NULL,
-                                      closeButton = TRUE,
-                                      id = "headers_for_sf_error",
-                                      type = "error")
-                   } else if ("character" %in% class(current_headers)) {
-                     results <- NULL
-                     showNotification(ui = paste0("API error retrieving headers for spatial query: ",
-                                                  current_headers),
-                                      duration = NULL,
-                                      closeButton = TRUE,
-                                      id = "api_header_error",
-                                      type = "error")
-                   } else {
-                     # If there was no error, proceed
-                     message("Converting header info to sf object")
-                     current_headers_sf <- sf::st_as_sf(x = current_headers,
-                                                        coords = c("Longitude_NAD83",
-                                                                   "Latitude_NAD83"),
-                                                        crs = "+proj=longlat +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +no_defs +type=crs")
-                     
-                     # This'll be useful so I can make a map, if that feature is added
-                     workspace$header_sf <- current_headers_sf
-                     workspace$mapping_header_sf <- current_headers_sf
-                     
-                     message("Performing sf_intersection()")
-                     points_polygons_intersection <- tryCatch(sf::st_intersection(x = current_headers_sf[, "PrimaryKey"],
-                                                                                  y = sf::st_transform(workspace$polygons[, "unique_id"],
-                                                                                                       crs = sf::st_crs(current_headers_sf))),
-                                                              error = function(error){"There was a geoprocessing error. Please try using the 'repair polygons' option."})
-                     
-                     if ("character" %in% class(points_polygons_intersection)) {
-                       showNotification(ui = points_polygons_intersection,
-                                        duration = NULL,
-                                        closeButton = TRUE,
-                                        type = "error",
-                                        id = "intersection_error")
-                       results <- NULL
-                     } else {
-                       current_primary_keys <- unique(points_polygons_intersection$PrimaryKey)
                        
-                       if (length(current_primary_keys) < 1) {
-                         message("No data were found")
-                         showNotification(ui = paste0("No data were found within your polygons."),
+                       message(paste0("class(current_headers) is: ",
+                                      paste(class(current_headers),
+                                            collapse = ", ")))
+                       
+                       if (is.null(current_headers)) {
+                         showNotification(ui = paste0("No matching data were found in the Landscape Data Commons."),
                                           duration = NULL,
                                           closeButton = TRUE,
-                                          id = "no_overlap",
-                                          type = "warning")
-                         results <- NULL
+                                          type = "error",
+                                          id = "api_headers_error")
+                         workspace$mapping_header_sf <- NULL
                        } else {
-                         # current_key_chunk_count <- ceiling(length(current_primary_keys) / 100)
-                         # 
-                         # current_primary_keys <- sapply(X = 1:current_key_chunk_count,
-                         #                                keys_vector = current_primary_keys,
-                         #                                key_chunk_size = 100,
-                         #                                key_count = length(current_primary_keys),
-                         #                                FUN = function(X, keys_vector, key_chunk_size, key_count) {
-                         #                                  min_index <- max(c(1, (X - 1) * key_chunk_size + 1))
-                         #                                  max_index <- min(c(key_count, X * key_chunk_size))
-                         #                                  indices <- min_index:max_index
-                         #                                  paste(keys_vector[indices],
-                         #                                        collapse = ",")
-                         #                                })
-                         message("Retrieving data using PrimaryKey values from spatial intersection")
-                         results <- tryCatch(fetch_ldc(keys = current_primary_keys,
-                                                       key_type = "PrimaryKey",
-                                                       username = workspace[["username"]],
-                                                       password = workspace[["password"]],
-                                                       token = workspace[["token"]],
-                                                       data_type = input$data_type,
-                                                       key_chunk_size = 100,
-                                                       verbose = TRUE),
-                                             error = function(error){
-                                               gsub(x = error,
-                                                    pattern = "^Error.+[ ]:[ ]",
-                                                    replacement = "")
-                                             })
-                         
-                         # Only keep going if there are results!!!!
-                         if (length(results) > 0 & "data.frame" %in% class(results)) {
-                           message("Making workspace$mapping_header_sf")
-                           workspace$mapping_header_sf <- current_headers_sf[current_headers_sf$PrimaryKey %in% results$PrimaryKey,]
-                           
-                           message("Coercing variables to numeric.")
-                           # Convert from character to numeric variables where possible
-                           data_corrected <- lapply(X = names(results),
-                                                    data = results,
-                                                    FUN = function(X, data){
-                                                      # Get the current variable values as a vector
-                                                      vector <- data[[X]]
-                                                      # Try to coerce into numeric
-                                                      numeric_vector <- as.numeric(vector)
-                                                      # If that works without introducing NAs, return the numeric vector
-                                                      # Otherwise, return the original character vector
-                                                      if (all(!is.na(numeric_vector))) {
-                                                        return(numeric_vector)
-                                                      } else {
-                                                        return(vector)
-                                                      }
-                                                    })
-                           
-                           
-                           # From some reason co.call(cbind, data_corrected) was returning a list not a data frame
-                           # so I'm resorting to using dplyr
-                           data <- dplyr::bind_cols(data_corrected)
-                           # Correct the names of the variables
-                           names(data) <- names(results)
-                           
-                           # Put it in the workspace list
-                           message("Setting data_fresh to TRUE because we just downloaded it")
-                           workspace$data_fresh <- TRUE
-                           workspace$raw_data <- data
-                         } else if (length(results) == 0) {
-                           message("No records found for those PrimaryKeys")
-                           if (length(current_primary_keys) > 0) {
-                             no_data_spatial_error_message <- paste0("Although sampling locations were found within your polygons, they did not have associated data of the type requested.")
-                           } else {
-                             no_data_spatial_error_message <- paste0("No sampling locations were found within your polygons.")
-                           }
-                           showNotification(ui = paste0(no_data_spatial_error_message,
-                                                        results),
+                         if ("character" %in% class(current_headers)) {
+                           showNotification(ui = paste0("Encountered the following API error retrieving header info for mapping: ",
+                                                        current_headers),
                                             duration = NULL,
                                             closeButton = TRUE,
-                                            id = "no_data_spatial_error",
-                                            type = "error")
-                           workspace$raw_data <- NULL
-                         } else {
-                           showNotification(ui = paste0("API error retrieving data based on spatial query: ",
-                                                        results),
-                                            duration = NULL,
-                                            closeButton = TRUE,
-                                            id = "primarykey_spatial_error",
-                                            type = "error")
-                           workspace$raw_data <- NULL
+                                            type = "error",
+                                            id = "api_headers_error")
+                           workspace$mapping_header_sf <- NULL
+                         } else if ("data.frame" %in% class(current_headers)) {
+                           message("Converting header info to sf object")
+                           current_headers_sf <- sf::st_as_sf(x = current_headers,
+                                                              coords = c("Longitude_NAD83",
+                                                                         "Latitude_NAD83"),
+                                                              crs = "+proj=longlat +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +no_defs +type=crs")
+                           
+                           # This'll be useful so I can make a map
+                           workspace$header_sf <-
+                             workspace$mapping_header_sf <- current_headers_sf
                          }
                        }
                      }
+                   } else {
+                     showNotification(ui = paste0("API error retrieving data: ",
+                                                  results),
+                                      duration = NULL,
+                                      closeButton = TRUE,
+                                      id = "api_error",
+                                      type = "error")
+                     workspace$raw_data <- NULL
+                     workspace$header_sf <-
+                       workspace$mapping_header_sf <- NULL
                    }
                  }
                })
@@ -3094,41 +2709,7 @@ server <- function(input, output, session) {
   observeEvent(eventExpr = workspace$raw_data,
                handlerExpr = {
                  message("workspace$raw_data has updated")
-                 
-                 # Checking for valid records.
-                 # If all the variables that aren't these ID variables are NULL
-                 # then it's a fake record
-                 
-                 message("Finding and attempting to remove any NULL/NA data entries.")
-                 id_vars <- c("rid", "PrimaryKey", "DBKey", "ProjectKey", "DateLoadedInDb", "DateVisited")
-                 id_vars_present <- id_vars[id_vars %in% names(workspace$raw_data)]
-                 non_id_vars <- names(workspace$raw_data)[!(names(workspace$raw_data) %in% id_vars)]
-                 
-                 valid_indices <- apply(X = workspace$raw_data[, non_id_vars],
-                                        MARGIN = 1,
-                                        FUN = function(X){
-                                          nulls <- sapply(X = X,
-                                                          is.null)
-                                          nas <- sapply(X = X,
-                                                        is.na)
-                                          
-                                          !all(mapply(X = nulls,
-                                                      Y = nas,
-                                                      FUN = function(X, Y){
-                                                        X | Y
-                                                      }))
-                                        })
-                 
-                 if (!all(valid_indices)) {
-                   showNotification(ui = "Some of the retrieved data had NULL values rendering them unusuable and have therefore been removed.",
-                                    duration = NULL,
-                                    closeButton = TRUE,
-                                    id = "null_data_warning",
-                                    type = "warning")
-                 }
-                 
-                 workspace$raw_data <- workspace$raw_data[valid_indices, ]
-                 
+                 glimpse(workspace$raw_data)
                  if (workspace$current_data_source == "ldc") {
                    message("Current data source is the LDC, using workspace$raw_data as workspace$data")
                    workspace$data <- workspace$raw_data

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<svg width="80" height="20" viewBox="0 0 80 20" xmlns="http://www.w3.org/2000/svg">
+
+  <style>
+
+    circle{fill:#FFFFFFFF;}
+
+    #a{animation: na1 2s ease 0s infinite;}
+    #b{animation: na1 2s ease 0.5s infinite;}
+    #c{animation: na1 2s ease 1s infinite;}
+    
+    @keyframes na1{
+      0%{fill:#FFFFFF00;}
+      50%{fill:#FFFFFFFF;}
+      100%{fill:#FFFFFF00;}
+    }
+
+</style>
+
+<circle id="a" cx="10" cy="10" r="10"/>
+<circle id="b" cx="40" cy="10" r="10"/>
+<circle id="c" cx="70" cy="10" r="10"/>
+
+</svg>

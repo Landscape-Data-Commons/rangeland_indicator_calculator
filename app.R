@@ -208,9 +208,8 @@ ui <- fluidPage(
                           ),
                           conditionalPanel(
                             condition = "$('html').hasClass('shiny-busy')",
-                            br(),
                             HTML(
-                              "<div class = 'busy-message' id = 'busy_message_start'><img src = 'busy_icon_complex.svg' height = '60rem'>Working! Please wait.<img src = 'busy_icon_complex.svg' height = '60rem'></div>"
+                              "<div class = 'load-message'><div class = 'loading-text'>Working <img class = 'throbber' src = 'ellipsis_throbber.svg' height = '11 rem'></div></div>"
                             )
                           )
                  ),
@@ -518,9 +517,8 @@ ui <- fluidPage(
                                                        uiOutput(outputId = "proceed_to_calculate_soil_ui"),
                                                        conditionalPanel(
                                                          condition = "$('html').hasClass('shiny-busy')",
-                                                         br(),
                                                          HTML(
-                                                           "<div class = 'busy-message' id = 'busy_message_configure'><img src = 'busy_icon_complex.svg' height = '60rem'>Working! Please wait.<img src = 'busy_icon_complex.svg' height = '60rem'></div>"
+                                                           "<div class = 'load-message'><div class = 'loading-text'>Working <img class = 'throbber' src = 'ellipsis_throbber.svg' height = '11 rem'></div></div>"
                                                          )
                                                        ),
                                                        fluidRow(br(),
@@ -760,18 +758,18 @@ ui <- fluidPage(
                                             label = "Calculate!"))),
                conditionalPanel(
                  condition = "$('html').hasClass('shiny-busy')",
-                 br(),
                  HTML(
-                   "<div class = 'busy-message' id = 'busy_message_calculate'><img src = 'busy_icon_complex.svg' height = '60rem'>Working! Please wait.<img src = 'busy_icon_complex.svg' height = '60rem'></div>"
+                   "<div class = 'load-message'><div class = 'loading-text'>Working <img class = 'throbber' src = 'ellipsis_throbber.svg' height = '11 rem'></div></div>"
                  )
-               )),
-               mainPanel(class = "main-panel",
-                         fluidRow(column(width = 10,
-                                         uiOutput("download_button_ui"))),
-                         fluidRow(column(width = 10,
-                                         textOutput(outputId = "metadata_text"))),
-                         fluidRow(column(width = 10,
-                                         DT::DTOutput(outputId = "results_table")))))),
+               )
+             ),
+             mainPanel(class = "main-panel",
+                       fluidRow(column(width = 10,
+                                       uiOutput("download_button_ui"))),
+                       fluidRow(column(width = 10,
+                                       textOutput(outputId = "metadata_text"))),
+                       fluidRow(column(width = 10,
+                                       DT::DTOutput(outputId = "results_table")))))),
     ###### Help #####################################
     tabPanel(title = "Help",
              sidebarLayout(

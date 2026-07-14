@@ -8,8 +8,8 @@ library(leaflet)
 library(leaflet.extras)
 library(sf)
 library(shinyjs)
-library(terradactyl)
 library(trex)
+library(terradactyl)
 source("functions.R")
 
 
@@ -24,7 +24,7 @@ source("functions.R")
 
 # Define UI for application
 ui <- fluidPage(
-  title = "Rangeland Indicator Calculator",
+  title = "Grazing Lands Indicator Calculator",
   useShinyjs(),
   use_cicerone(),
   tags$head(
@@ -50,7 +50,7 @@ ui <- fluidPage(
   ),
   navbarPage(
     title = tags$div(class = "tool-title",
-                     "Rangeland Indicator Calculator"),
+                     "Grazing Lands Indicator Calculator"),
     id = "navbar-full",
     position = "static-top",
     footer = tags$div(class = "footer",
@@ -150,14 +150,14 @@ ui <- fluidPage(
                  ),
                  # If the data are coming from the LDC, offer the chance to use
                  # credentials
-                 fluidRow(column(width = 10,
-                                 uiOutput("ldc_no_credentials_ui"))),
-                 fluidRow(column(width = 10,
-                                 uiOutput("ldc_get_credentials_ui"))),
-                 fluidRow(column(width = 10,
-                                 uiOutput("ldc_credentials_ui")),
-                          column(width = 1,
-                                 uiOutput("ldc_credentials_info_ui"))),
+                 # fluidRow(column(width = 10,
+                 #                 uiOutput("ldc_no_credentials_ui"))),
+                 # fluidRow(column(width = 10,
+                 #                 uiOutput("ldc_get_credentials_ui"))),
+                 # fluidRow(column(width = 10,
+                 #                 uiOutput("ldc_credentials_ui")),
+                 #          column(width = 1,
+                 #                 uiOutput("ldc_credentials_info_ui"))),
                  # If the data are going to come from the LDC, give the option
                  # to display all current data locations
                  br(),
@@ -222,9 +222,8 @@ ui <- fluidPage(
                           ),
                           conditionalPanel(
                             condition = "$('html').hasClass('shiny-busy')",
-                            br(),
                             HTML(
-                              "<div class = 'busy-message' id = 'busy_message_start'><img src = 'busy_icon_complex.svg' height = '60rem'>Working! Please wait.<img src = 'busy_icon_complex.svg' height = '60rem'></div>"
+                              "<div class = 'load-message'><div class = 'loading-text'>Working <img class = 'throbber' src = 'ellipsis_throbber.svg' height = '11 rem'></div></div>"
                             )
                           )
                  ),
@@ -419,7 +418,8 @@ ui <- fluidPage(
                                                                                                              radioButtons(inputId = "species_source",
                                                                                                                           label = "Species lookup table source",
                                                                                                                           choices = c("None" = "none",
-                                                                                                                                      "Default USDA Plants" = "default",
+                                                                                                                                      "BLM Terrestrial AIM" = "tblnationalplants",
+                                                                                                                                      "USDA Plants" = "usda",
                                                                                                                                       "Upload" = "upload"),
                                                                                                                           selected = "none")),
                                                                                                       column(width = 1,
@@ -448,6 +448,17 @@ ui <- fluidPage(
                                                                                                                                                    multiple = FALSE)),
                                                                                                                                 column(width = 1,
                                                                                                                                        actionButton(inputId = "growth_habit_var_info",
+                                                                                                                                                    label = "",
+                                                                                                                                                    class = "info-btn",
+                                                                                                                                                    icon = icon("circle-question")))),
+                                                                                                                       fluidRow(column(width = 10,
+                                                                                                                                       selectInput(inputId = "growth_habit_sub_var",
+                                                                                                                                                   label = "Growth habit subcategory variable in lookup table",
+                                                                                                                                                   choices = c(""),
+                                                                                                                                                   selected = "",
+                                                                                                                                                   multiple = FALSE)),
+                                                                                                                                column(width = 1,
+                                                                                                                                       actionButton(inputId = "growth_habit_sub_var_info",
                                                                                                                                                     label = "",
                                                                                                                                                     class = "info-btn",
                                                                                                                                                     icon = icon("circle-question")))),
@@ -532,9 +543,8 @@ ui <- fluidPage(
                                                        uiOutput(outputId = "proceed_to_calculate_soil_ui"),
                                                        conditionalPanel(
                                                          condition = "$('html').hasClass('shiny-busy')",
-                                                         br(),
                                                          HTML(
-                                                           "<div class = 'busy-message' id = 'busy_message_configure'><img src = 'busy_icon_complex.svg' height = '60rem'>Working! Please wait.<img src = 'busy_icon_complex.svg' height = '60rem'></div>"
+                                                           "<div class = 'load-message'><div class = 'loading-text'>Working <img class = 'throbber' src = 'ellipsis_throbber.svg' height = '11 rem'></div></div>"
                                                          )
                                                        ),
                                                        fluidRow(br(),
@@ -576,11 +586,11 @@ ui <- fluidPage(
                                                                                  "First hit" = "first",
                                                                                  "Basal hit" = "basal",
                                                                                  "Species" = "species",
-                                                                                 "Bare soil" = "bare_ground",
+                                                                                 "Bare soil" = "bare soil",
                                                                                  "Litter" = "litter",
-                                                                                 "Between-plant" = "between_plant",
-                                                                                 "Total foliar" = "total_foliar",
-                                                                                 "Non-plant surface" = "nonplant_ground"))),
+                                                                                 "Between-plant" = "between plant",
+                                                                                 "Total foliar" = "total foliar",
+                                                                                 "Non-plant surface" = "ground"))),
                                                   column(width = 1,
                                                          actionButton(inputId = "lpi_hit_info",
                                                                       label = "",
@@ -743,18 +753,18 @@ ui <- fluidPage(
                                                                       class = "info-btn",
                                                                       icon = icon("circle-question"))))
                         ),
-                        conditionalPanel(condition = "input.data_type == 'species'",
-                                         fluidRow(column(width = 10,
-                                                         selectInput(inputId = "species_output_format",
-                                                                     label = "Output format",
-                                                                     choices = c("Wide" = "wide",
-                                                                                 "Long" = "long"))),
-                                                  column(width = 1,
-                                                         actionButton(inputId = "species_output_format_info",
-                                                                      label = "",
-                                                                      class = "info-btn",
-                                                                      icon = icon("circle-question"))))
-                        ),
+                        # conditionalPanel(condition = "input.data_type == 'species'",
+                        #                  fluidRow(column(width = 10,
+                        #                                  selectInput(inputId = "species_output_format",
+                        #                                              label = "Output format",
+                        #                                              choices = c("Wide" = "wide",
+                        #                                                          "Long" = "long"))),
+                        #                           column(width = 1,
+                        #                                  actionButton(inputId = "species_output_format_info",
+                        #                                               label = "",
+                        #                                               class = "info-btn",
+                        #                                               icon = icon("circle-question"))))
+                        # ),
                         fluidRow(column(width = 10,
                                         selectInput(inputId = "additional_output_vars",
                                                     label = "Additional metadata variables",
@@ -774,18 +784,18 @@ ui <- fluidPage(
                                             label = "Calculate!"))),
                conditionalPanel(
                  condition = "$('html').hasClass('shiny-busy')",
-                 br(),
                  HTML(
-                   "<div class = 'busy-message' id = 'busy_message_calculate'><img src = 'busy_icon_complex.svg' height = '60rem'>Working! Please wait.<img src = 'busy_icon_complex.svg' height = '60rem'></div>"
+                   "<div class = 'load-message'><div class = 'loading-text'>Working <img class = 'throbber' src = 'ellipsis_throbber.svg' height = '11 rem'></div></div>"
                  )
-               )),
-               mainPanel(class = "main-panel",
-                         fluidRow(column(width = 10,
-                                         uiOutput("download_button_ui"))),
-                         fluidRow(column(width = 10,
-                                         textOutput(outputId = "metadata_text"))),
-                         fluidRow(column(width = 10,
-                                         DT::DTOutput(outputId = "results_table")))))),
+               )
+             ),
+             mainPanel(class = "main-panel",
+                       fluidRow(column(width = 10,
+                                       uiOutput("download_button_ui"))),
+                       fluidRow(column(width = 10,
+                                       textOutput(outputId = "metadata_text"))),
+                       fluidRow(column(width = 10,
+                                       DT::DTOutput(outputId = "results_table")))))),
     ###### Help #####################################
     tabPanel(title = "Help",
              sidebarLayout(
@@ -841,8 +851,14 @@ server <- function(input, output, session) {
                               drawn_polygon_sf = NULL,
                               metadata_lut = NULL,
                               polygons = NULL,
-                              default_species_filename = "usda_plants_characteristics_lookup_20210830.csv",
-                              species_list_terradat = readRDS(file = "data/species_list_terradat.rds"),
+                              usda = read.csv(file.path(getwd(),
+                                                        "data",
+                                                        "usda_plants_characteristics_lookup_20260714.csv"),
+                                              stringsAsFactors = FALSE),
+                              tblnationalplants = read.csv(file.path(getwd(),
+                                                                     "data",
+                                                                     "tblNationalPlants.csv"),
+                                                           stringsAsFactors = FALSE),
                               data_fresh = TRUE,
                               data = NULL,
                               raw_data = NULL,
@@ -1194,39 +1210,29 @@ server <- function(input, output, session) {
   #   #           actionButton(inputId = "fetch_data",
   #   #                        label = "Fetch data"))
   #   # }
-  #   if (input$ldc_no_credentials_confirmation | req(nchar(input$ldc_credentials_email) > 4 & nchar(input$ldc_credentials_password) > 0)) {
+  #   if (req(input$ldc_no_credentials_confirmation) | req(nchar(input$ldc_credentials_email) > 4 & nchar(input$ldc_credentials_password) > 0)) {
   #     message("Credentials situation workable. Rendering fetch button.")
   #     tagList(br(),
   #             actionButton(inputId = "fetch_data",
   #                          label = "Fetch data"))
-  #   } else {
-  #     message("Credentials situation unworkable. Waiting to render fetch button.")
   #   }
   # })
-  # output$fetch_ui2 <- renderUI(expr = if (req(input$query_method == "spatial" & (input$polygon_source == "upload" & input$polygons_layer != ""))) {
-  #   message("Checking to see if it's time to render the fetch button.")
-  #   message(paste0("query_method is spatial, polygon_source is ", input$polygon_source, " and polygons_layer is ", input$polygons_layer, "."))
-  #   if (req(input$ldc_no_credentials_confirmation) | (req(nchar(input$ldc_credentials_email) > 4 & nchar(input$ldc_credentials_password) > 0))) {
-  #     message("Credentials situation workable. Rendering fetch button.")
-  #     tagList(br(),
-  #             actionButton(inputId = "fetch_data",
-  #                          label = "Fetch data"))
-  #   } else {
-  #     message("Credentials situation unworkable. Waiting to render fetch button.")
-  #   }
-  # })
-  # output$fetch_ui3 <- renderUI(expr = if (req(input$query_method == "spatial" & input$polygon_source == "draw" & !is.null(workspace$drawn_polygon_sf))) {
-  #   message("Checking to see if it's time to render the fetch button.")
-  #   message(paste0("query_method is spatial, polygon_source is ", input$polygon_source, " and drawn_polygon_sf is not NULL."))
-  #   if (req(input$ldc_no_credentials_confirmation | (nchar(input$ldc_credentials_email) > 4 & nchar(input$ldc_credentials_password) > 0))) {
-  #     message("Credentials situation workable. Rendering fetch button.")
-  #     tagList(br(),
-  #             actionButton(inputId = "fetch_data",
-  #                          label = "Fetch data"))
-  #   } else {
-  #     message("Credentials situation unworkable. Waiting to render fetch button.")
-  #   }
-  # })
+  output$fetch_ui2 <- renderUI(expr = if (req(input$query_method == "spatial" & (input$polygon_source == "upload" & input$polygons_layer != ""))) {
+    message("Rendering fetch_ui2")
+    # if (req(input$ldc_no_credentials_confirmation) | (req(nchar(input$ldc_credentials_email) > 4 & nchar(input$ldc_credentials_password) > 0))) {
+    tagList(br(),
+            actionButton(inputId = "fetch_data",
+                         label = "Fetch data"))
+    # }
+  })
+  output$fetch_ui3 <- renderUI(expr = if (req(input$query_method == "spatial" & input$polygon_source == "draw" & !is.null(workspace$drawn_polygon_sf))) {
+    message("Rendering fetch_ui3")
+    # if (req(input$ldc_no_credentials_confirmation | (nchar(input$ldc_credentials_email) > 4 & nchar(input$ldc_credentials_password) > 0))) {
+    tagList(br(),
+            actionButton(inputId = "fetch_data",
+                         label = "Fetch data"))
+    # }
+  })
   
   # Building the links to other tabs!
   # Note that we have to do this with a() and an onclick argument that calls the
@@ -1316,7 +1322,7 @@ server <- function(input, output, session) {
   })
   
   ###### Configure Data tab ######
-  output$add_generic_species_button_ui <- renderUI( if(req(!is.null(workspace$data)) & req(input$add_generic_species) & req(input$growth_habit_var != "") & req(input$duration_var != "")) {
+  output$add_generic_species_button_ui <- renderUI( if(req(!is.null(workspace$data)) & req(input$add_generic_species) & req(input$growth_habit_var != "") & req(input$growth_habit_sub_var != "") & req(input$duration_var != "")) {
     fluidRow(column(width = 12,
                     align = "center",
                     actionButton(inputId = "add_generic_species_button",
@@ -1726,8 +1732,8 @@ server <- function(input, output, session) {
                                             "If you want to add additional information about species to the data (e.g., conservation status, forage quality, functional group) you can join a lookup table to the data.",
                                             br(),
                                             br(),
+                                            "The Terrestrial AIM table is maintained by the BLM and is used for calculating indicators in the BLM Terrestrial AIM Database (TerrADat). This is the recommended built-in list to use.",
                                             "The table derived from the USDA Plants includes growth habit and duration for all species in the database. Note that many species may be listed in USDA Plants as having multiple growth habits or durations but the lookup table only includes one for each, the more persistent option.",
-                                            "The Terrestrial AIM table is the same used for calculating indicators in the BLM Terrestrial AIM Database (TerrADat) and includes growth habit and duration.",
                                             br(),
                                             br(),
                                             "If you have other attributes to add or wish to specify different growth habits and durations for species, you can instead upload a lookup table as a CSV. It must have a variable for the species code and only one observation/row per species code.",
@@ -1750,7 +1756,17 @@ server <- function(input, output, session) {
                  message("Displaying info about growth habit variable")
                  showModal(ui = modalDialog(size = "s",
                                             easyClose = TRUE,
-                                            "In order to add generic species' growth habit information (e.g. forb, graminoid, tree) to a lookup table, you must specify the variable in the lookup table already containing the growth habit information.",
+                                            "In order to add generic species' growth habit information (e.g. woody, herbaceous) to a lookup table, you must specify the variable in the lookup table already containing the growth habit information.",
+                                            footer = tagList(modalButton("Close")))
+                 )
+               })
+  
+  observeEvent(eventExpr = input$growth_habit_sub_var_info,
+               handlerExpr = {
+                 message("Displaying info about growth habit sub variable")
+                 showModal(ui = modalDialog(size = "s",
+                                            easyClose = TRUE,
+                                            "In order to add generic species' growth habit subcategory information (e.g. forb, graminoid, tree) to a lookup table, you must specify the variable in the lookup table already containing the growth habit subcategory information.",
                                             footer = tagList(modalButton("Close")))
                  )
                })
@@ -2090,30 +2106,9 @@ server <- function(input, output, session) {
   ##### Grabbing the headers when asked ########################################
   observeEvent(eventExpr = req(input$get_headers),
                handlerExpr = {
-                 message("The get headers button was pressed.")
-                 # if (req(!identical(input$ldc_credentials_email, workspace[["username"]]))) {
-                 # message("LDC username updated")
-                 workspace[["username"]] <- input$ldc_credentials_email
-                 if (workspace[["username"]] == "") {
-                   workspace[["username"]] <- NULL
-                 }
-                 # }
-                 message(paste("workspace$username is:", workspace[["username"]]))
-                 
-                 # if (req(!identical(input$ldc_credentials_password, workspace[["password"]]))) {
-                 # message("LDC password updated")
-                 workspace[["password"]] <- input$ldc_credentials_password
-                 if (workspace[["password"]] == "") {
-                   workspace[["password"]] <- NULL
-                 }
-                 # }
-                 message(paste("workspace$password is:", workspace[["password"]]))
                  
                  message("Headers requested to populate the map")
                  current_headers <- tryCatch(fetch_ldc(data_type = "header",
-                                                       username = workspace[["username"]],
-                                                       password = workspace[["password"]],
-                                                       token = workspace[["token"]],
                                                        verbose = TRUE),
                                              error = function(error){
                                                gsub(x = error,
@@ -2560,19 +2555,16 @@ server <- function(input, output, session) {
   observeEvent(eventExpr = input$species_source,
                handlerExpr = {
                  message("input$species_source has changed")
-                 if (input$species_source == "default") {
-                   message("Species source set to default. Reading in default species data.")
-                   defaults_species_filepath <- paste0(workspace$original_directory,
-                                                       "/",
-                                                       workspace$default_species_filename)
-                   workspace[["species_data"]] <- read.csv(defaults_species_filepath,
-                                                           stringsAsFactors = FALSE)
+                 if (input$species_source %in% c("usda", "tblnationalplants")) {
+                   message("Species source set to usda.")
+                   
+                   workspace[["species_data"]] <- workspace[[input$species_source]]
                    # TODO
                    # Set workspace$species_data to the default list (which doesn't exist yet)
                    # Set this variable so we can handle the data appropriately based on source
-                   workspace$current_species_source <- "default"
+                   workspace$current_species_source <- input$species_source
                  } else {
-                   message("Species source is not default. Doing nothing")
+                   message("Species source is not one of the built-ins. Doing nothing")
                  }
                })
   
@@ -2584,12 +2576,12 @@ server <- function(input, output, session) {
                  
                  message("Attempting to update the selected variables in the species data")
                  # For the joining variable
-                 proposed_code_var <- base::intersect(x = c("NameCode",
-                                                            "code"),
-                                                      current_species_data_vars)[1]
-                 if (length(proposed_code_var) > 0) {
-                   message(paste0("Found '", proposed_code_var, "' in the species data. Setting that as the species_joining_var"))
-                   selection <- proposed_code_var
+                 species_data_code_vars <- c("usda" = "code",
+                                             "tblnationalplants" = "NameCode")
+                 if (any(species_data_code_vars %in% current_species_data_vars)) {
+                   message("Found one of the default code variables in the species data. Setting that as the species_joining_var")
+                   selection <- intersect(x = species_data_code_vars,
+                                          y = current_species_data_vars)[1]
                  } else {
                    message("Setting species_joining_var to ''")
                    selection <- ""
@@ -2602,18 +2594,31 @@ server <- function(input, output, session) {
                  
                  # For the growth habit variable
                  # We'll guess at the two most common options before giving up
-                 if ("GrowthHabitSub" %in% current_species_data_vars) {
-                   message("Found 'GrowthHabitSub' in the species data. Setting that as growth_habit_var")
-                   selection <- "GrowthHabitSub"
-                 } else if ("growth_habit" %in% current_species_data_vars) {
-                   message("Found 'growth_habit' in the species data. Setting that as growth_habit_var")
-                   selection <- "growth_habit"
+                 if (any(c("growth_habit", "growthhabit", "GrowthHabit") %in% current_species_data_vars)) {
+                   message("Found growth habit variable in the species data. Setting that as growth_habit_var")
+                   selection <- intersect(x = c("growth_habit", "growthhabit", "GrowthHabit"),
+                                          y = current_species_data_vars)[1]
                  } else {
                    message("Setting growth_habit_var to ''")
                    selection <- ""
                  }
                  updateSelectInput(session = session,
                                    inputId = "growth_habit_var",
+                                   choices = c("",
+                                               current_species_data_vars),
+                                   selected = selection)
+                 
+                 if (any(c("growth_habit_sub", "growthhabitsub", "GrowthHabitSub") %in% current_species_data_vars)) {
+                   message("Found growth habit subcategory variable in the species data. Setting that as growth_habit_sub_var")
+                   selection <- intersect(x = c("growth_habit_sub", "growthhabitsub", "GrowthHabitSub"),
+                                          y = current_species_data_vars)[1]
+                 } else {
+                   message("Setting growth_habit_sub_var to ''")
+                   selection <- ""
+                 }
+                 
+                 updateSelectInput(session = session,
+                                   inputId = "growth_habit_sub_var",
                                    choices = c("",
                                                current_species_data_vars),
                                    selected = selection)
@@ -2646,73 +2651,7 @@ server <- function(input, output, session) {
                  # Set this variable so we can handle the data appropriately based on source
                  # Since there are from the LDC, we'll also be looking for header info
                  workspace$current_data_source <- "ldc"
-                 message("Data source set to LDC")
-                 
-                 # Gotta handle API token stuff now.
-                 if (as.logical(input$ldc_no_credentials_confirmation)) {
-                   # Nullify any token we have right now if the user doesn't
-                   # want to use credentials.
-                   message("User has declined to use LDC credentials. Making sure token is NULL.")
-                   workspace[["token"]] <- NULL
-                 } else {
-                   message("Attempting to use the provided LDC credentials.")
-                   # if (req(!identical(input$ldc_credentials_email, workspace[["username"]]))) {
-                   #   message("LDC username updated")
-                   workspace[["username"]] <- input$ldc_credentials_email
-                   if (workspace[["username"]] == "") {
-                     workspace[["username"]] <- NULL
-                   }
-                   message(paste("workspace$username is:", workspace[["username"]]))
-                   # }
-                   # if (req(!identical(input$ldc_credentials_password, workspace[["password"]]))) {
-                   #   message("LDC password updated")
-                   workspace[["password"]] <- input$ldc_credentials_password
-                   if (workspace[["password"]] == "") {
-                     workspace[["password"]] <- NULL
-                   }
-                   message(paste("workspace$password is:", workspace[["password"]]))
-                   # }
-                   
-                   # Provided we want a token, try to make that happen.
-                   if (is.null(workspace[["token"]])) {
-                     message("No token available right now. Grabbing a new one.")
-                     current_token <- tryCatch(expr = get_ldc_token(username = workspace[["username"]],
-                                                                    password = workspace[["password"]]),
-                                               error = function(error){
-                                                 gsub(x = error,
-                                                      pattern = "^Error.+[ ]:[ ]",
-                                                      replacement = "") 
-                                               })
-                   } else {
-                     if (workspace[["token"]][["expiration_time"]] > Sys.time()) {
-                       message("The token is expired. Attempting to grab a new one.")
-                       current_token <- tryCatch(expr = get_ldc_token(username = workspace[["username"]],
-                                                                      password = workspace[["password"]]),
-                                                 error = function(error){
-                                                   gsub(x = error,
-                                                        pattern = "^Error.+[ ]:[ ]",
-                                                        replacement = "") 
-                                                 })
-                     }
-                   }
-                   message(paste("Class of current_token is",
-                                 paste(class(current_token),
-                                       collapse = ", ")))
-                   if (identical(class(current_token), "character")) {
-                     message("Token is invalid. Reporting error.")
-                     showNotification(ui = paste("There was an error using the supplied credentials:",
-                                                 stringr::str_extract(string = current_token,
-                                                                      pattern = "(?<=Error in AWS Lambda function: ).+$"),
-                                                 "Only data which do not require credentials will be returned."),
-                                      duration = NULL,
-                                      closeButton = TRUE,
-                                      type = "error",
-                                      id = "token_error")
-                     workspace[["token"]] <- NULL
-                   } else {
-                     workspace[["token"]] <- current_token
-                   }
-                 }
+                 message("Data source set to LDC")                 
                  
                  if (input$query_method != "spatial") {
                    message("Nullifying workspace$mapping_polygons for mapping reasons")
@@ -2720,271 +2659,22 @@ server <- function(input, output, session) {
                    message("Querying by keys")
                    # Only do anything if there's at least one key
                    if (input$keys != "") {
-                     message("Converting keys to a vector.")
-                     # Handle multiple requested ecosites at once!
-                     current_key_vector <- stringr::str_split(string = input$keys,
-                                                              pattern = ",",
-                                                              simplify = TRUE)
-                     
-                     # This will make it easy to check to see if any of these values
-                     # weren't associated with data
-                     current_key_vector <- trimws(current_key_vector)
-                     
-                     # fetch_ldc() can take a vector (slow, retrieves one at a time)
-                     # or a string of values separated by commas (fast, retrieves all at once)
-                     current_key_string <- paste(current_key_vector,
-                                                 collapse = ",")
-                     
-                     
-                     # The API queryable tables don't include ecosite, so we grab
-                     # the header table and get primary keys from that
-                     if (input$query_method == "EcologicalSiteID") {
-                       message("key_type is EcologicalSiteID")
-                       message("Retrieving headers")
-                       current_headers <- tryCatch(fetch_ldc(keys = current_key_string,
-                                                             key_type = input$query_method,
-                                                             data_type = "header",
-                                                             username = workspace[["username"]],
-                                                             password = workspace[["password"]],
-                                                             token = workspace[["token"]],
-                                                             verbose = TRUE),
-                                                   error = function(error){
-                                                     gsub(x = error,
-                                                          pattern = "^Error.+[ ]:[ ]",
-                                                          replacement = "")
-                                                   })
-                       
-                       message(paste0("class(current_headers) is ",
-                                      paste(class(current_headers),
-                                            collapse = ", ")))
-                       if (is.null(current_headers)) {
-                         message("class(current_headers) is NULL. Setting results to NULL")
-                         # showNotification(ui = "Unfortunately something went wrong retrieving the data from the Landscape Data Commons.",
-                         #                  duration = NULL,
-                         #                  closeButton = TRUE,
-                         #                  type = "error",
-                         #                  id = "unknown_headers_error")
-                         results <- NULL
-                       } else if ("character" %in% class(current_headers)) {
-                         results <- NULL
-                       } else {
-                         current_headers_sf <- sf::st_as_sf(x = current_headers,
-                                                            coords = c("Longitude_NAD83",
-                                                                       "Latitude_NAD83"),
-                                                            crs = "+proj=longlat +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +no_defs +type=crs")
-                         
-                         # This'll be useful so I can make a map
-                         workspace$mapping_header_sf <- current_headers_sf
-                         current_primary_keys <- current_headers$PrimaryKey
-                         
-                         # current_key_chunk_count <- ceiling(length(current_primary_keys) / 100)
-                         # 
-                         # current_primary_keys <- sapply(X = 1:current_key_chunk_count,
-                         #                                keys_vector = current_primary_keys,
-                         #                                key_chunk_size = 100,
-                         #                                key_count = length(current_primary_keys),
-                         #                                FUN = function(X, keys_vector, key_chunk_size, key_count) {
-                         #                                  min_index <- max(c(1, (X - 1) * key_chunk_size + 1))
-                         #                                  max_index <- min(c(key_count, X * key_chunk_size))
-                         #                                  indices <- min_index:max_index
-                         #                                  paste(keys_vector[indices],
-                         #                                        collapse = ",")
-                         #                                })
-                         
-                         message("Retrieving data using PrimaryKey values from headers")
-                         results <- tryCatch(fetch_ldc(keys = current_primary_keys,
-                                                       key_type = "PrimaryKey",
-                                                       data_type = input$data_type,
-                                                       username = workspace[["username"]],
-                                                       password = workspace[["password"]],
-                                                       token = workspace[["token"]],
-                                                       verbose = TRUE),
-                                             error = function(error){
-                                               gsub(x = error,
-                                                    pattern = "^Error.+[ ]:[ ]",
-                                                    replacement = "")
-                                             })
-                       }
-                     } else {
-                       message("key_type is not EcologicalSiteID")
-                       message("Retrieving data using provided keys")
-                       current_key_chunk_count <- ceiling(length(current_key_vector) / 100)
-                       
-                       current_keys_chunks <- sapply(X = 1:current_key_chunk_count,
-                                                     keys_vector = current_key_vector,
-                                                     key_chunk_size = 100,
-                                                     key_count = length(current_key_vector),
-                                                     FUN = function(X, keys_vector, key_chunk_size, key_count) {
-                                                       min_index <- max(c(1, (X - 1) * key_chunk_size + 1))
-                                                       max_index <- min(c(key_count, X * key_chunk_size))
-                                                       indices <- min_index:max_index
-                                                       paste(keys_vector[indices],
-                                                             collapse = ",")
-                                                     })
-                       
-                       results <- tryCatch(fetch_ldc(keys = current_keys_chunks,
-                                                     key_type = input$query_method,
-                                                     data_type = input$data_type,
-                                                     username = workspace[["username"]],
-                                                     password = workspace[["password"]],
-                                                     token = workspace[["token"]],
-                                                     verbose = TRUE),
-                                           error = function(error){
-                                             gsub(x = error,
-                                                  pattern = "^Error.+[ ]:[ ]",
-                                                  replacement = "")
-                                           })
-                     }
-                   }
-                   
-                   # So we can tell the user later which actually got queried
-                   if (is.null(results)) {
-                     message("No data from LDC!")
-                     workspace$missing_keys <- current_key_vector
-                     showNotification(ui = "No data were found associated with your keys.",
-                                      duration = NULL,
-                                      closeButton = TRUE,
-                                      type = "warning",
-                                      id = "no_data_returned_warning")
-                   } else if ("character" %in% class(results)) {
-                     # If results is actually an error message, display it
-                     showNotification(ui = results,
-                                      duration = NULL,
-                                      closeButton = TRUE,
-                                      type = "error",
-                                      id = "api_error")
-                     workspace$missing_keys <- NULL
+                     message("Retrieving data using provided keys")
+                     results <- tryCatch(fetch_ldc(data_type = input$data_type,
+                                                   query_parameters = list(list("in" = input$keys)) |>
+                                                     setNames(object = _,
+                                                              nm = input$query_method),
+                                                   multi_table_queries = TRUE,
+                                                   verbose = TRUE),
+                                         error = function(error){
+                                           gsub(x = error,
+                                                pattern = "^Error.+[ ]:[ ]",
+                                                replacement = "")
+                                         })
                    } else {
-                     # Let's get map info!
-                     message("Getting current headers for mapping")
-                     current_primarykeys <- unique(results$PrimaryKey)
-                     current_primarykey_chunk_count <- ceiling(length(current_key_vector) / 100)
-                     
-                     current_primarykeys_chunks <- sapply(X = 1:current_primarykey_chunk_count,
-                                                          keys_vector = current_primarykeys,
-                                                          key_chunk_size = 100,
-                                                          key_count = length(current_primarykeys),
-                                                          FUN = function(X, keys_vector, key_chunk_size, key_count) {
-                                                            min_index <- max(c(1, (X - 1) * key_chunk_size + 1))
-                                                            max_index <- min(c(key_count, X * key_chunk_size))
-                                                            indices <- min_index:max_index
-                                                            paste(keys_vector[indices],
-                                                                  collapse = ",")
-                                                          })
-                     message("Actually fetching current headers based on PrimaryKeys")
-                     current_headers <- tryCatch(fetch_ldc(keys = current_primarykeys_chunks,
-                                                           key_type = "PrimaryKey",
-                                                           data_type = "header",
-                                                           username = workspace[["username"]],
-                                                           password = workspace[["password"]],
-                                                           token = workspace[["token"]],
-                                                           verbose = TRUE),
-                                                 error = function(error){
-                                                   gsub(x = error,
-                                                        pattern = "^Error.+[ ]:[ ]",
-                                                        replacement = "")
-                                                 })
-                     
-                     message(paste0("class(current_headers) is: ",
-                                    paste(class(current_headers),
-                                          collapse = ", ")))
-                     if (is.null(current_headers)) {
-                       showNotification(ui = paste0("No matching data were found in the Landscape Data Commons."),
-                                        duration = NULL,
-                                        closeButton = TRUE,
-                                        type = "error",
-                                        id = "api_headers_error")
-                       workspace$mapping_header_sf <- NULL
-                     } else {
-                       if ("character" %in% class(current_headers)) {
-                         showNotification(ui = paste0("Encountered the following API error retrieving header info for mapping: ",
-                                                      current_headers),
-                                          duration = NULL,
-                                          closeButton = TRUE,
-                                          type = "error",
-                                          id = "api_headers_error")
-                         workspace$mapping_header_sf <- NULL
-                       } else if ("data.frame" %in% class(current_headers)) {
-                         message("Converting header info to sf object")
-                         current_headers_sf <- sf::st_as_sf(x = current_headers,
-                                                            coords = c("Longitude_NAD83",
-                                                                       "Latitude_NAD83"),
-                                                            crs = "+proj=longlat +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +no_defs +type=crs")
-                         
-                         # This'll be useful so I can make a map
-                         workspace$mapping_header_sf <- current_headers_sf
-                       }
-                     }
-                     
-                     
-                     message("Determining if keys are missing.")
-                     message(paste0("input$query_method is: ",
-                                    paste(input$query_method,
-                                          collapse = ", ")))
-                     # Because ecosites were two-stage, we check in with headers
-                     if (input$query_method %in% c("EcologicalSiteID")) {
-                       workspace$queried_keys <- unique(current_headers[[input$query_method]])
-                     } else {
-                       workspace$queried_keys <- unique(results[[input$query_method]])
-                     }
-                     
-                     workspace$missing_keys <- current_key_vector[!(current_key_vector %in% workspace$queried_keys)]
+                     results <- NULL
                    }
                    
-                   message("Determining if workspace$missing_keys has length > 0")
-                   if (length(workspace$missing_keys) > 0) {
-                     message(paste0("The following key values are missing: ",
-                                    paste(workspace$missing_keys,
-                                          collapse = ", ")))
-                     key_error <- paste0("The following keys did not have data associated with them: ",
-                                         paste(workspace$missing_keys,
-                                               collapse = ", "))
-                     showNotification(ui = key_error,
-                                      duration = NULL,
-                                      closeButton = TRUE,
-                                      type = "warning",
-                                      id = "key_error")
-                   } else {
-                     message("No missing keys!")
-                   }
-                   
-                   
-                   # Only keep going if there are results!!!!
-                   if (length(results) > 0 & "data.frame" %in% class(results)) {
-                     message("Coercing variables to numeric.")
-                     # Convert from character to numeric variables where possible
-                     data_corrected <- lapply(X = names(results),
-                                              data = results,
-                                              FUN = function(X, data){
-                                                # Get the current variable values as a vector
-                                                vector <- data[[X]]
-                                                # Try to coerce into numeric
-                                                numeric_vector <- as.numeric(vector)
-                                                # If that works without introducing NAs, return the numeric vector
-                                                # Otherwise, return the original character vector
-                                                if (all(!is.na(numeric_vector))) {
-                                                  return(numeric_vector)
-                                                } else {
-                                                  return(vector)
-                                                }
-                                              })
-                     
-                     # From some reason co.call(cbind, data_corrected) was returning a list not a data frame
-                     # so I'm resorting to using dplyr
-                     data <- dplyr::bind_cols(data_corrected)
-                     # Correct the names of the variables
-                     names(data) <- names(results)
-                     
-                     # Put it in the workspace list
-                     message("Setting data_fresh to TRUE because we just downloaded it")
-                     workspace$data_fresh <- TRUE
-                     workspace$raw_data <- data
-                   } else {
-                     workspace$raw_data <- NULL
-                   }
-                   
-                   message("Data are from the LDC and include header info. Setting workspace$headers to NULL.")
-                   workspace$headers <- NULL
                    
                  } else if (input$query_method == "spatial") {
                    message("Spatial query time!")
@@ -3033,166 +2723,92 @@ server <- function(input, output, session) {
                    message("Updating workspace$mapping_polygons")
                    workspace$mapping_polygons <- workspace$polygons
                    
-                   if (is.null(workspace$headers)) {
-                     message("Retrieving headers")
-                     workspace$headers <- tryCatch(fetch_ldc(keys = NULL,
-                                                             key_type = NULL,
-                                                             data_type = "header",
-                                                             username = workspace[["username"]],
-                                                             password = workspace[["password"]],
-                                                             token = workspace[["token"]],
+                   message("Retrieving data")
+                   results <- tryCatch(fetch_ldc_spatial(polygons = workspace$polygons,
+                                                         data_type = input$data_type,
+                                                         return_spatial = FALSE,
+                                                         verbose = TRUE),
+                                       error = function(error){
+                                         gsub(x = error,
+                                              pattern = "^Error.+[ ]:[ ]",
+                                              replacement = "")
+                                       })
+                 }
+                 
+                 if (is.null(results)) {
+                   showNotification(ui = switch(input$query_method,
+                                                "spatial" = "No sampling locations were found within your polygons.",
+                                                "No data were found associated with your keys."),
+                                    duration = NULL,
+                                    closeButton = TRUE,
+                                    id = "no_data_returned_error",
+                                    type = "error")
+                   workspace$header_sf <-
+                     workspace$mapping_header_sf <- NULL
+                 } else {
+                   if (length(results) > 0 & "data.frame" %in% class(results)) {
+                     # Put it in the workspace list
+                     message("Setting data_fresh to TRUE because we just downloaded it")
+                     workspace$data_fresh <- TRUE
+                     workspace$raw_data <- results
+                     
+                     # So we can tell the user later which actually got queried
+                     if (!is.null(results) & !is.character(results)) {
+                       # Let's get map info!
+                       message("Getting current headers for mapping")
+                       message("Actually fetching current headers based on PrimaryKeys")
+                       current_headers <- tryCatch(fetch_ldc(data_type = "header",
+                                                             query_parameters = list(PrimaryKey = list("in" = unique(results$PrimaryKey))),
                                                              verbose = TRUE),
                                                    error = function(error){
                                                      gsub(x = error,
                                                           pattern = "^Error.+[ ]:[ ]",
                                                           replacement = "")
                                                    })
-                     message(paste0("class(workspace$headers) is ",
-                                    paste(class(workspace$headers),
-                                          collapse = ", ")))
-                   }
-                   
-                   current_headers <- workspace$headers
-                   
-                   if (is.null(current_headers)) {
-                     results <- NULL
-                     showNotification(ui = paste0("No matching data were found in the Landscape Data Commons."),
-                                      duration = NULL,
-                                      closeButton = TRUE,
-                                      id = "headers_for_sf_error",
-                                      type = "error")
-                   } else if ("character" %in% class(current_headers)) {
-                     results <- NULL
-                     showNotification(ui = paste0("API error retrieving headers for spatial query: ",
-                                                  current_headers),
-                                      duration = NULL,
-                                      closeButton = TRUE,
-                                      id = "api_header_error",
-                                      type = "error")
-                   } else {
-                     # If there was no error, proceed
-                     message("Converting header info to sf object")
-                     current_headers_sf <- sf::st_as_sf(x = current_headers,
-                                                        coords = c("Longitude_NAD83",
-                                                                   "Latitude_NAD83"),
-                                                        crs = "+proj=longlat +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +no_defs +type=crs")
-                     
-                     # This'll be useful so I can make a map, if that feature is added
-                     workspace$header_sf <- current_headers_sf
-                     workspace$mapping_header_sf <- current_headers_sf
-                     
-                     message("Performing sf_intersection()")
-                     points_polygons_intersection <- tryCatch(sf::st_intersection(x = current_headers_sf[, "PrimaryKey"],
-                                                                                  y = sf::st_transform(workspace$polygons[, "unique_id"],
-                                                                                                       crs = sf::st_crs(current_headers_sf))),
-                                                              error = function(error){"There was a geoprocessing error. Please try using the 'repair polygons' option."})
-                     
-                     if ("character" %in% class(points_polygons_intersection)) {
-                       showNotification(ui = points_polygons_intersection,
-                                        duration = NULL,
-                                        closeButton = TRUE,
-                                        type = "error",
-                                        id = "intersection_error")
-                       results <- NULL
-                     } else {
-                       current_primary_keys <- unique(points_polygons_intersection$PrimaryKey)
                        
-                       if (length(current_primary_keys) < 1) {
-                         message("No data were found")
-                         showNotification(ui = paste0("No data were found within your polygons."),
+                       message(paste0("class(current_headers) is: ",
+                                      paste(class(current_headers),
+                                            collapse = ", ")))
+                       
+                       if (is.null(current_headers)) {
+                         showNotification(ui = paste0("No matching data were found in the Landscape Data Commons."),
                                           duration = NULL,
                                           closeButton = TRUE,
-                                          id = "no_overlap",
-                                          type = "warning")
-                         results <- NULL
+                                          type = "error",
+                                          id = "api_headers_error")
+                         workspace$mapping_header_sf <- NULL
                        } else {
-                         # current_key_chunk_count <- ceiling(length(current_primary_keys) / 100)
-                         # 
-                         # current_primary_keys <- sapply(X = 1:current_key_chunk_count,
-                         #                                keys_vector = current_primary_keys,
-                         #                                key_chunk_size = 100,
-                         #                                key_count = length(current_primary_keys),
-                         #                                FUN = function(X, keys_vector, key_chunk_size, key_count) {
-                         #                                  min_index <- max(c(1, (X - 1) * key_chunk_size + 1))
-                         #                                  max_index <- min(c(key_count, X * key_chunk_size))
-                         #                                  indices <- min_index:max_index
-                         #                                  paste(keys_vector[indices],
-                         #                                        collapse = ",")
-                         #                                })
-                         message("Retrieving data using PrimaryKey values from spatial intersection")
-                         results <- tryCatch(fetch_ldc(keys = current_primary_keys,
-                                                       key_type = "PrimaryKey",
-                                                       username = workspace[["username"]],
-                                                       password = workspace[["password"]],
-                                                       token = workspace[["token"]],
-                                                       data_type = input$data_type,
-                                                       key_chunk_size = 100,
-                                                       verbose = TRUE),
-                                             error = function(error){
-                                               gsub(x = error,
-                                                    pattern = "^Error.+[ ]:[ ]",
-                                                    replacement = "")
-                                             })
-                         
-                         # Only keep going if there are results!!!!
-                         if (length(results) > 0 & "data.frame" %in% class(results)) {
-                           message("Making workspace$mapping_header_sf")
-                           workspace$mapping_header_sf <- current_headers_sf[current_headers_sf$PrimaryKey %in% results$PrimaryKey,]
-                           
-                           message("Coercing variables to numeric.")
-                           # Convert from character to numeric variables where possible
-                           data_corrected <- lapply(X = names(results),
-                                                    data = results,
-                                                    FUN = function(X, data){
-                                                      # Get the current variable values as a vector
-                                                      vector <- data[[X]]
-                                                      # Try to coerce into numeric
-                                                      numeric_vector <- as.numeric(vector)
-                                                      # If that works without introducing NAs, return the numeric vector
-                                                      # Otherwise, return the original character vector
-                                                      if (all(!is.na(numeric_vector))) {
-                                                        return(numeric_vector)
-                                                      } else {
-                                                        return(vector)
-                                                      }
-                                                    })
-                           
-                           
-                           # From some reason co.call(cbind, data_corrected) was returning a list not a data frame
-                           # so I'm resorting to using dplyr
-                           data <- dplyr::bind_cols(data_corrected)
-                           # Correct the names of the variables
-                           names(data) <- names(results)
-                           
-                           # Put it in the workspace list
-                           message("Setting data_fresh to TRUE because we just downloaded it")
-                           workspace$data_fresh <- TRUE
-                           workspace$raw_data <- data
-                         } else if (length(results) == 0) {
-                           message("No records found for those PrimaryKeys")
-                           if (length(current_primary_keys) > 0) {
-                             no_data_spatial_error_message <- paste0("Although sampling locations were found within your polygons, they did not have associated data of the type requested.")
-                           } else {
-                             no_data_spatial_error_message <- paste0("No sampling locations were found within your polygons.")
-                           }
-                           showNotification(ui = paste0(no_data_spatial_error_message,
-                                                        results),
+                         if ("character" %in% class(current_headers)) {
+                           showNotification(ui = paste0("Encountered the following API error retrieving header info for mapping: ",
+                                                        current_headers),
                                             duration = NULL,
                                             closeButton = TRUE,
-                                            id = "no_data_spatial_error",
-                                            type = "error")
-                           workspace$raw_data <- NULL
-                         } else {
-                           showNotification(ui = paste0("API error retrieving data based on spatial query: ",
-                                                        results),
-                                            duration = NULL,
-                                            closeButton = TRUE,
-                                            id = "primarykey_spatial_error",
-                                            type = "error")
-                           workspace$raw_data <- NULL
+                                            type = "error",
+                                            id = "api_headers_error")
+                           workspace$mapping_header_sf <- NULL
+                         } else if ("data.frame" %in% class(current_headers)) {
+                           message("Converting header info to sf object")
+                           current_headers_sf <- sf::st_as_sf(x = current_headers,
+                                                              coords = c("Longitude_NAD83",
+                                                                         "Latitude_NAD83"),
+                                                              crs = "+proj=longlat +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +no_defs +type=crs")
+                           
+                           # This'll be useful so I can make a map
+                           workspace$header_sf <-
+                             workspace$mapping_header_sf <- current_headers_sf
                          }
                        }
                      }
+                   } else {
+                     showNotification(ui = paste0("API error retrieving data: ",
+                                                  results),
+                                      duration = NULL,
+                                      closeButton = TRUE,
+                                      id = "api_error",
+                                      type = "error")
+                     workspace$raw_data <- NULL
+                     workspace$header_sf <-
+                       workspace$mapping_header_sf <- NULL
                    }
                  }
                })
@@ -3201,41 +2817,7 @@ server <- function(input, output, session) {
   observeEvent(eventExpr = workspace$raw_data,
                handlerExpr = {
                  message("workspace$raw_data has updated")
-                 
-                 # Checking for valid records.
-                 # If all the variables that aren't these ID variables are NULL
-                 # then it's a fake record
-                 
-                 message("Finding and attempting to remove any NULL/NA data entries.")
-                 id_vars <- c("rid", "PrimaryKey", "DBKey", "ProjectKey", "DateLoadedInDb", "DateVisited")
-                 id_vars_present <- id_vars[id_vars %in% names(workspace$raw_data)]
-                 non_id_vars <- names(workspace$raw_data)[!(names(workspace$raw_data) %in% id_vars)]
-                 
-                 valid_indices <- apply(X = workspace$raw_data[, non_id_vars],
-                                        MARGIN = 1,
-                                        FUN = function(X){
-                                          nulls <- sapply(X = X,
-                                                          is.null)
-                                          nas <- sapply(X = X,
-                                                        is.na)
-                                          
-                                          !all(mapply(X = nulls,
-                                                      Y = nas,
-                                                      FUN = function(X, Y){
-                                                        X | Y
-                                                      }))
-                                        })
-                 
-                 if (!all(valid_indices)) {
-                   showNotification(ui = "Some of the retrieved data had NULL values rendering them unusuable and have therefore been removed.",
-                                    duration = NULL,
-                                    closeButton = TRUE,
-                                    id = "null_data_warning",
-                                    type = "warning")
-                 }
-                 
-                 workspace$raw_data <- workspace$raw_data[valid_indices, ]
-                 
+                 glimpse(workspace$raw_data)
                  if (workspace$current_data_source == "ldc") {
                    message("Current data source is the LDC, using workspace$raw_data as workspace$data")
                    workspace$data <- workspace$raw_data
@@ -3563,8 +3145,8 @@ server <- function(input, output, session) {
                                         closeButton = TRUE,
                                         id = "no_data_for_generics_error",
                                         type = "error")
-                     } else if (input$growth_habit_var == "" | input$duration_var == "") {
-                       showNotification(ui = "You must specify the growth habit and duration variables in order to add generic species codes.",
+                     } else if (input$growth_habit_var == "" | input$growth_habit_sub_var == "" | input$duration_var == "") {
+                       showNotification(ui = "You must specify the growth habit, growth habit subcategory, and duration variables in order to add generic species codes.",
                                         duration = NULL,
                                         closeButton = TRUE,
                                         type = "error",
@@ -3578,18 +3160,20 @@ server <- function(input, output, session) {
                                                                                   data_code = input$data_joining_var,
                                                                                   species_list = workspace$species_data,
                                                                                   species_code = input$species_joining_var,
-                                                                                  species_growth_habit_code = input$growth_habit_var,
-                                                                                  species_duration = input$duration_var))
+                                                                                  species_growthhabit = input$growth_habit_var,
+                                                                                  species_growthhabitsub = input$growth_habit_sub_var,
+                                                                                  species_duration = input$duration_var,
+                                                                                  verbose = TRUE))
                        # Make sure that the growth habit and duration information is
                        # in the correct variables.
                        # Which indices have the attributed generic codes?
-                       unknown_indices <- is.na(species_list_with_generics[[input$growth_habit_var]]) & !is.na(species_list_with_generics[["GrowthHabitSub"]])
+                       unknown_indices <- is.na(species_list_with_generics[[input$growth_habit_var]]) & !is.na(species_list_with_generics[[input$growth_habit_var]])
                        
                        # At those indices, write in the growth habit and duration info
                        # from the default variables to the user's selected variables
                        if (any(unknown_indices)) {
-                         species_list_with_generics[[input$growth_habit_var]][unknown_indices] <- as.character(species_list_with_generics[["GrowthHabitSub"]][unknown_indices])
-                         species_list_with_generics[[input$duration_var]][unknown_indices] <- as.character(species_list_with_generics[["Duration"]][unknown_indices])
+                         species_list_with_generics[[input$growth_habit_var]][unknown_indices] <- as.character(species_list_with_generics[[input$growth_habit_var]][unknown_indices])
+                         species_list_with_generics[[input$duration_var]][unknown_indices] <- as.character(species_list_with_generics[[input$duration_var]][unknown_indices])
                        }
                        
                        # Reduce to only the variables we had coming into this
@@ -3775,7 +3359,7 @@ server <- function(input, output, session) {
                      if (current_var_value != "") {
                        message(paste0("Writing contents of worskpace$calc_data$",
                                       current_var_value,
-                                      " to workspace$data$",
+                                      " to workspace$calc_data$",
                                       required_var))
                        workspace$calc_data[[required_var]] <- workspace$calc_data[[current_var_value]]
                      } else {
@@ -3785,291 +3369,308 @@ server <- function(input, output, session) {
                    }
                    
                    message("Calculating!")
-                   switch(input$data_type,
-                          "lpi" = {
-                            message("Calculating cover from LPI.")
-                            
-                            if (input$lpi_hit %in% c("any", "first", "basal")) {
-                              message("This is a generalized LPI calc and will use pct_cover()")
-                              # Handle the grouping variables (if any)!
-                              message("input$lpi_grouping_vars is:")
-                              message(input$lpi_grouping_vars)
-                              
-                              current_lpi_grouping_vars <- input$lpi_grouping_vars
-                              current_lpi_grouping_vars <- current_lpi_grouping_vars[!(current_lpi_grouping_vars %in% c(""))]
-                              
-                              if (length(current_lpi_grouping_vars) > 0) {
-                                lpi_grouping_vars_vector <- current_lpi_grouping_vars
-                                
-                                message("There are grouping variables.")
-                                current_lpi_vars <- names(workspace$calc_data)
-                                missing_lpi_grouping_vars <- lpi_grouping_vars_vector[!(lpi_grouping_vars_vector %in% current_lpi_vars)]
-                                available_lpi_grouping_vars <- lpi_grouping_vars_vector[lpi_grouping_vars_vector %in% current_lpi_vars]
-                                
-                                if (length(missing_lpi_grouping_vars) < 1) {
-                                  message("No variables missing!")
-                                  lpi_cover_string <- paste0("tryCatch(pct_cover(",
-                                                             "lpi_tall = workspace$calc_data,",
-                                                             "tall = input$lpi_output_format == 'long',",
-                                                             "hit = input$lpi_hit,",
-                                                             "by_line = input$lpi_unit == 'line',",
-                                                             paste(lpi_grouping_vars_vector,
-                                                                   collapse = ","),
-                                                             "),error = function(error){error})")
-                                } else {
-                                  message("Missing one or more variables.")
-                                  missing_lpi_grouping_vars_warning <- paste0("The following variables are missing: ",
-                                                                              paste(missing_lpi_grouping_vars,
-                                                                                    collapse = ", "),
-                                                                              ". Results will be calculated without grouping.")
-                                  showNotification(ui = missing_lpi_grouping_vars_warning,
-                                                   duration = NULL,
-                                                   closeButton = TRUE,
-                                                   id = "missing_lpi_grouping_vars",
-                                                   type = "warning")
-                                  lpi_cover_string <- paste0("tryCatch(pct_cover(",
-                                                             "lpi_tall = workspace$calc_data,",
-                                                             "tall = input$lpi_output_format == 'long',",
-                                                             "hit = input$lpi_hit,",
-                                                             "by_line = input$lpi_unit == 'line'",
-                                                             "),error = function(error){error})")
-                                }
-                                
-                              } else {
-                                message("No grouping variables.")
-                                lpi_cover_string <- paste0("tryCatch(pct_cover(",
-                                                           "lpi_tall = workspace$calc_data,",
-                                                           "tall = input$lpi_output_format == 'long',",
-                                                           "hit = input$lpi_hit,",
-                                                           "by_line = input$lpi_unit == 'line'",
-                                                           "),error = function(error){error})")
-                              }
-                            } else {
-                              message("This is a specialized LPI call and will be using a wrapper for pct_cover()")
-                              switch(input$lpi_hit,
-                                     "species" = {
-                                       lpi_cover_string <- paste0("tryCatch(pct_cover_species(",
-                                                                  "lpi_tall = workspace$calc_data,",
-                                                                  "tall = input$lpi_output_format == 'long',",
-                                                                  "by_line = input$lpi_unit == 'line'",
-                                                                  "),error = function(error){error})")
-                                     },
-                                     "bare_ground" = {
-                                       lpi_cover_string <- paste0("tryCatch(pct_cover_bare_soil(",
-                                                                  "lpi_tall = workspace$calc_data,",
-                                                                  "tall = input$lpi_output_format == 'long',",
-                                                                  "by_line = input$lpi_unit == 'line'",
-                                                                  "),error = function(error){error})")
-                                     },
-                                     "litter" = {
-                                       lpi_cover_string <- paste0("tryCatch(pct_cover_litter(",
-                                                                  "lpi_tall = workspace$calc_data,",
-                                                                  "tall = input$lpi_output_format == 'long',",
-                                                                  "by_line = input$lpi_unit == 'line'",
-                                                                  "),error = function(error){error})")
-                                     },
-                                     "between_plant" = {
-                                       lpi_cover_string <- paste0("tryCatch(pct_cover_between_plant(",
-                                                                  "lpi_tall = workspace$calc_data,",
-                                                                  "tall = input$lpi_output_format == 'long',",
-                                                                  "by_line = input$lpi_unit == 'line'",
-                                                                  "),error = function(error){error})")
-                                     },
-                                     "total_foliar" = {
-                                       lpi_cover_string <- paste0("tryCatch(pct_cover_total_foliar(",
-                                                                  "lpi_tall = workspace$calc_data,",
-                                                                  "tall = input$lpi_output_format == 'long',",
-                                                                  "by_line = input$lpi_unit == 'line'",
-                                                                  "),error = function(error){error})")
-                                     },
-                                     "nonplant_ground" = {
-                                       lpi_cover_string <- paste0("tryCatch(pct_cover_all_ground(",
-                                                                  "lpi_tall = workspace$calc_data,",
-                                                                  "tall = input$lpi_output_format == 'long',",
-                                                                  "by_line = input$lpi_unit == 'line'",
-                                                                  "),error = function(error){error})")
-                                     })
-                            }
-                            
-                            message("The function call is:")
-                            message(lpi_cover_string)
-                            current_results <- eval(parse(text = lpi_cover_string))
-                          },
-                          "gap" = {
-                            message("Calculating gaps.")
-                            current_gap_breaks <- stringr::str_split(string = input$gap_breaks,
-                                                                     pattern = ",",
-                                                                     simplify = TRUE)
-                            current_gap_breaks <- as.numeric(trimws(current_gap_breaks))
-                            
-                            if (any(is.na(current_gap_breaks))) {
-                              message("At least one of the gap breakpoints isn't numeric!")
-                              gap_results <- "One or more of the gap breakpoints is non-numeric. Please provide the gap breaks separated by commas."
-                            } else if (length(input$gap_indicator_types) < 1) {
-                              message("No indicator type selected")
-                              gap_results <- "No indicator types selected to calculate."
-                            } else {
-                              message("Gap breaks are all good and at least one indicator type is selected")
-                              message("Calculating gap")
-                              gap_results <- tryCatch(gap_cover(gap_tall = workspace$calc_data,
-                                                                tall = input$gap_output_format == "long",
-                                                                breaks = current_gap_breaks,
-                                                                type = input$gap_type,
-                                                                by_line = (input$gap_unit == "line")),
-                                                      error = function(error){
-                                                        error
-                                                      })
-                              gap_results <- gap_results[input$gap_indicator_types]
-                              message(paste0("Remaining names of gap results are: ",
-                                             paste(names(gap_results),
-                                                   collapse = ", ")))
-                              message(head(gap_results))
-                              message("Gaps calculated")
-                            }
-                            
-                            
-                            
-                            # Only if we actually calculated anything!
-                            if (any(sapply(gap_results, is.null))) {
-                              showNotification(ui = "The incoming data were malformed and no results could be calculated.",
-                                               duration = NULL,
-                                               closeButton = TRUE,
-                                               id = "gap_data_malformed_warning",
-                                               type = "error")
-                              current_results <- NULL
-                            } else if (!is.character(gap_results)) {
-                              message("Gap results aren't character")
-                              # Apparently gap_cover() returns a list of data frames
-                              # when tall = FALSE so let's combine them
-                              if (input$gap_output_format == "wide") {
-                                # First up is to rename the variables using the stats
-                                for (index in seq_len(length(gap_results))) {
-                                  current_stat <- names(gap_results)[index]
-                                  current_vars <- names(gap_results[[index]])
-                                  gap_class_var_indices <- grepl(current_vars,
-                                                                 pattern = "\\d|NoGap")
-                                  gap_class_vars <- current_vars[gap_class_var_indices]
-                                  names(gap_results[[index]])[gap_class_var_indices] <- paste0(gap_class_vars,
-                                                                                               "_",
-                                                                                               current_stat)
-                                }
-                                # Then mash them together
-                                current_results <- Reduce(f = dplyr::full_join,
-                                                          x = gap_results)
-                              } else {
-                                # If the results are long, we're already ready to go
-                                current_results <- do.call(rbind,
-                                                           gap_results)
-                              }
-                            } else {
-                              message("Gap results are an error message")
-                              current_results <- gap_results
-                            }
-                            
-                          },
-                          "height" = {
-                            message("Handling grouping variables")
-                            # Handle the grouping variables (if any)!
-                            height_grouping_vars_vector <- stringr::str_split(string = input$height_grouping_vars,
-                                                                              pattern = ",",
-                                                                              simplify = TRUE)
-                            height_grouping_vars_vector <- as.vector(height_grouping_vars_vector)
-                            height_grouping_vars_vector <- trimws(height_grouping_vars_vector)
-                            
-                            # Total bandaid
-                            if (length(height_grouping_vars_vector) < 1) {
-                              height_grouping_vars_vector <- ""
-                            }
-                            
-                            message(paste0("Current height_grouping_vars_vector is: ",
-                                           paste(height_grouping_vars_vector,
-                                                 collapse = ", ")))
-                            message(paste0("The length of height_grouping_vars_vector is ",
-                                           length(height_grouping_vars_vector)))
-                            
-                            height_by_line <- input$height_unit == "line"
-                            output_tall <- input$height_output_format == "long"
-                            
-                            if (!("" %in% height_grouping_vars_vector)) {
-                              message("There are grouping variables!")
-                              current_height_vars <- names(workspace$calc_data)
-                              missing_height_grouping_vars <- height_grouping_vars_vector[!(height_grouping_vars_vector %in% current_height_vars)]
-                              available_height_grouping_vars <- height_grouping_vars_vector[height_grouping_vars_vector %in% current_height_vars]
-                              message(paste0("missing_height_grouping_vars is currently: ",
-                                             paste(missing_height_grouping_vars,
-                                                   collapse = ", ")))
-                              
-                              if (length(missing_height_grouping_vars) < 1) {
-                                height_cover_string <- paste0("tryCatch(mean_height(",
-                                                              "height_tall = workspace$calc_data,",
-                                                              "method = 'mean',",
-                                                              "omit_zero = input$height_omit_zero,",
-                                                              "by_line = height_by_line,",
-                                                              "tall = output_tall,",
+                   current_results <- switch(input$data_type,
+                                             "lpi" = {
+                                               message("Calculating cover from LPI.")
+                                               
+                                               if (input$lpi_hit %in% c("any", "first", "basal")) {
+                                                 message("This is a generalized LPI calc and will use pct_cover()")
+                                                 # Handle the grouping variables (if any)!
+                                                 message("input$lpi_grouping_vars is:")
+                                                 message(input$lpi_grouping_vars)
+                                                 
+                                                 current_lpi_grouping_vars <- setdiff(x = input$lpi_grouping_vars,
+                                                                                      y = c(""))
+                                                 
+                                                 if (length(current_lpi_grouping_vars) > 0) {
+                                                   lpi_grouping_vars_vector <- current_lpi_grouping_vars
+                                                   
+                                                   message("There are grouping variables.")
+                                                   current_lpi_vars <- names(workspace$calc_data)
+                                                   missing_lpi_grouping_vars <- setdiff(x = lpi_grouping_vars_vector,
+                                                                                        y = current_lpi_vars)
+                                                   available_lpi_grouping_vars <- intersect(x = lpi_grouping_vars_vector,
+                                                                                            y = current_lpi_vars)
+                                                   
+                                                   if (length(missing_lpi_grouping_vars) < 1) {
+                                                     message("No variables missing!")
+                                                     indicator_vars <-  available_lpi_grouping_vars
+                                                   } else {
+                                                     message("Missing one or more variables.")
+                                                     missing_lpi_grouping_vars_warning <- paste0("The following variables are missing: ",
+                                                                                                 paste(missing_lpi_grouping_vars,
+                                                                                                       collapse = ", "),
+                                                                                                 ". Results will be calculated without grouping.")
+                                                     showNotification(ui = missing_lpi_grouping_vars_warning,
+                                                                      duration = NULL,
+                                                                      closeButton = TRUE,
+                                                                      id = "missing_lpi_grouping_vars",
+                                                                      type = "warning")
+                                                     indicator_vars <- NULL
+                                                   }
+                                                   
+                                                 } else {
+                                                   message("No grouping variables.")
+                                                   indicator_vars <- NULL
+                                                 }
+                                                 glimpse(workspace$calc_data)
+                                                 current_results <- tryCatch(expr = pct_cover(lpi_tall = workspace$calc_data,
+                                                                                              tall = input$lpi_output_format == "long",
+                                                                                              hit = input$lpi_hit,
+                                                                                              by_line = input$lpi_unit == "line",
+                                                                                              indicator_variables = indicator_vars,
+                                                                                              verbose = TRUE),
+                                                                             error = function(error){
+                                                                               error
+                                                                             })
+                                               } else {
+                                                 message("This is a specialized LPI call and will be using a wrapper for pct_cover()")
+                                                 
+                                                 if (input$lpi_hit == "total foliar") {
+                                                   current_data <- workspace$calc_data |>
+                                                     dplyr::rename(.data = _,
+                                                                   tidyselect::any_of(x = setNames(object = c(input$code_var,
+                                                                                                              input$growth_habit_var,
+                                                                                                              input$growth_habit_sub_var,
+                                                                                                              input$duration_var),
+                                                                                                   nm = c("code",
+                                                                                                          "GrowthHabit",
+                                                                                                          "GrowthHabitSub",
+                                                                                                          "Duration"))))
+                                                   
+                                                   if ("GrowthHabit" %in% names(current_data)) {
+                                                     message("Adding Plant variable using code and GrowthHabit")
+                                                     current_data <- dplyr::mutate(.data = current_data,
+                                                                                   Plant = dplyr::case_when(GrowthHabit != "Nonvascular" &
+                                                                                                              stringi::stri_length(code) >= 3 ~ "Plant",
+                                                                                                            .default = NA))
+                                                   } else {
+                                                     message("Adding Plant variable using code")
+                                                     current_data <- dplyr::mutate(.data = current_data,
+                                                                                   Plant = dplyr::case_when(stringi::stri_length(code) >= 3 ~ "Plant",
+                                                                                                            .default = NA))
+                                                   }
+                                                   
+                                                   current_results <- tryCatch(expr = pct_cover(lpi_tall = current_data,
+                                                                                                tall = TRUE,
+                                                                                                hit = "any",
+                                                                                                by_line = FALSE,
+                                                                                                indicator_variables = "Plant"),
+                                                                               error = function(error){
+                                                                                 error
+                                                                               })
+                                                   
+                                                   if ("data.frame" %in% class(current_results)) {
+                                                     current_results <- dplyr::mutate(.data = current_results,
+                                                                                      indicator = "TotalFoliarCover")
+                                                     if (input$lpi_output_format != "long") {
+                                                       current_results <- tidyr::pivot_wider(data = current_results,
+                                                                                             names_from = indicator,
+                                                                                             values_from = percent)
+                                                     }
+                                                   }
+                                                   
+                                                   
+                                                 } else {
+                                                   workspace$calc_data |>
+                                                     dplyr::rename(.data = _,
+                                                                   tidyselect::any_of(x = setNames(object = c(input$code_var,
+                                                                                                              input$growth_habit_var,
+                                                                                                              input$growth_habit_sub_var,
+                                                                                                              input$duration_var),
+                                                                                                   nm = c("code",
+                                                                                                          "GrowthHabit",
+                                                                                                          "GrowthHabitSub",
+                                                                                                          "Duration")))) |>
+                                                     glimpse()
+                                                   current_results <- tryCatch(expr = pct_cover_indicators(lpi_tall = workspace$calc_data |>
+                                                                                                             dplyr::rename(.data = _,
+                                                                                                                           tidyselect::any_of(x = setNames(object = c(input$code_var,
+                                                                                                                                                                      input$growth_habit_var,
+                                                                                                                                                                      input$growth_habit_sub_var,
+                                                                                                                                                                      input$duration_var),
+                                                                                                                                                           nm = c("code",
+                                                                                                                                                                  "GrowthHabit",
+                                                                                                                                                                  "GrowthHabitSub",
+                                                                                                                                                                  "Duration")))),
+                                                                                                           indicator_families = input$lpi_hit,
+                                                                                                           tall_output = setNames(object = input$lpi_output_format == "long",
+                                                                                                                                  nm = input$lpi_hit),
+                                                                                                           by_line = input$lpi_unit == "line",
+                                                                                                           hit_type = c(live = "any",
+                                                                                                                        species = "any"),
+                                                                                                           indicator_variables = list(`total foliar` = "code",
+                                                                                                                                      ground = "code",
+                                                                                                                                      `between plant` = "code",
+                                                                                                                                      `bare soil` = "code",
+                                                                                                                                      litter = "code",
+                                                                                                                                      live = c("chckbox",
+                                                                                                                                               "code"),
+                                                                                                                                      species = "code"),
+                                                                                                           verbose = TRUE,
+                                                                                                           digits = 6)[[1]],
+                                                                               error = function(error){
+                                                                                 error
+                                                                               })
+                                                 }
+                                               }
+                                               
+                                               
+                                               
+                                               current_results  
+                                             },
+                                             "gap" = {
+                                               message("Calculating gaps.")
+                                               current_gap_breaks <- stringr::str_split(string = input$gap_breaks,
+                                                                                        pattern = ",",
+                                                                                        simplify = TRUE)
+                                               current_gap_breaks <- as.numeric(trimws(current_gap_breaks))
+                                               
+                                               if (any(is.na(current_gap_breaks))) {
+                                                 message("At least one of the gap breakpoints isn't numeric!")
+                                                 current_results <- "One or more of the gap breakpoints is non-numeric. Please provide the gap breaks separated by commas."
+                                               } else if (length(input$gap_indicator_types) < 1) {
+                                                 message("No indicator type selected")
+                                                 current_results <- "No indicator types selected to calculate."
+                                               } else {
+                                                 message("Gap breaks are all good and at least one indicator type is selected")
+                                                 message("Calculating gap")
+                                                 current_results <- tryCatch(terradactyl::gap_cover(gap_tall = workspace$calc_data,
+                                                                                                    tall = input$gap_output_format == "long",
+                                                                                                    breaks = current_gap_breaks,
+                                                                                                    type = input$gap_type,
+                                                                                                    by_line = (input$gap_unit == "line"),
+                                                                                                    verbose = TRUE),
+                                                                             error = function(error){
+                                                                               error
+                                                                             })
+                                                 current_results <- current_results[input$gap_indicator_types]
+                                                 message(paste0("Remaining names of gap results are: ",
+                                                                paste(names(current_results),
+                                                                      collapse = ", ")))
+                                                 message(head(current_results))
+                                                 message("Gaps calculated")
+                                                 
+                                               }
+                                               
+                                               
+                                               
+                                               # Only if we actually calculated anything!
+                                               if (any(sapply(current_results, is.null))) {
+                                                 showNotification(ui = "The incoming data were malformed and no results could be calculated.",
+                                                                  duration = NULL,
+                                                                  closeButton = TRUE,
+                                                                  id = "gap_data_malformed_warning",
+                                                                  type = "error")
+                                                 current_results <- NULL
+                                               } else if (!is.character(current_results)) {
+                                                 message("Gap results aren't character")
+                                                 # Apparently gap_cover() returns a list of data frames
+                                                 # when tall = FALSE so let's combine them
+                                                 if (input$gap_output_format == "wide") {
+                                                   # First up is to rename the variables using the stats
+                                                   for (index in seq_len(length(current_results))) {
+                                                     current_stat <- names(current_results)[index]
+                                                     current_vars <- names(current_results[[index]])
+                                                     gap_class_var_indices <- grepl(current_vars,
+                                                                                    pattern = "\\d|NoGap")
+                                                     gap_class_vars <- current_vars[gap_class_var_indices]
+                                                     names(current_results[[index]])[gap_class_var_indices] <- paste0(gap_class_vars,
+                                                                                                                      "_",
+                                                                                                                      current_stat)
+                                                   }
+                                                   # Then mash them together
+                                                   current_results <- Reduce(f = dplyr::full_join,
+                                                                             x = current_results)
+                                                 } else {
+                                                   # If the results are long, we're already ready to go
+                                                   current_results <- dplyr::bind_rows(current_results)
+                                                 }
+                                               } else {
+                                                 message("Gap results are an error message")
+                                               }
+                                               
+                                               current_results
+                                             },
+                                             "height" = {
+                                               message("Handling grouping variables")
+                                               # Handle the grouping variables (if any)!
+                                               height_grouping_vars_vector <- stringr::str_split(string = input$height_grouping_vars,
+                                                                                                 pattern = ",",
+                                                                                                 simplify = TRUE) |>
+                                                 as.vector() |>
+                                                 trimws() |>
+                                                 setdiff(x = _,
+                                                         y = c(""))
+                                               
+                                               # Total bandaid. Unclear if still necessary
+                                               # if (length(height_grouping_vars_vector) < 1) {
+                                               #   height_grouping_vars_vector <- NULL
+                                               # }
+                                               
+                                               message(paste0("Current height_grouping_vars_vector is: ",
                                                               paste(height_grouping_vars_vector,
-                                                                    collapse = ","),
-                                                              "),error = function(error){error})"
-                                )
-                              } else {
-                                missing_height_grouping_vars_warning <- paste0("The following variables are missing: ",
-                                                                               paste(missing_height_grouping_vars,
-                                                                                     collapse = ", "),
-                                                                               ". Results will be calculated without grouping.")
-                                showNotification(ui = missing_height_grouping_vars_warning,
-                                                 duration = NULL,
-                                                 closeButton = TRUE,
-                                                 id = "missing_height_grouping_vars",
-                                                 type = "warning")
-                                height_cover_string <- paste0("tryCatch(mean_height(",
-                                                              "height_tall = workspace$calc_data,",
-                                                              "method = 'mean',",
-                                                              "omit_zero = input$height_omit_zero,",
-                                                              "by_line = height_by_line,",
-                                                              "tall = output_tall",
-                                                              "),error = function(error){error})"
-                                )
-                              }
-                              
-                            } else {
-                              message("No grouping vars!")
-                              height_cover_string <- paste0("tryCatch(mean_height(",
-                                                            "height_tall = workspace$calc_data,",
-                                                            "method = 'mean',",
-                                                            "omit_zero = input$height_omit_zero,",
-                                                            "by_line = height_by_line,",
-                                                            "tall = output_tall",
-                                                            "),error = function(error){error})"
-                              )
-                            }
-                            message("The function call is:")
-                            message(height_cover_string)
-                            message("Parsing")
-                            current_results <- eval(parse(text = height_cover_string))
-                            message("Parsed")
-                            
-                          },
-                          "soilstability" = {
-                            message("Calculating soil stability")
-                            current_results <- tryCatch(soil_stability(soil_stability_tall = workspace$calc_data,
-                                                                       all = "all" %in% input$soil_covergroups,
-                                                                       cover = "covered" %in% input$soil_covergroups,
-                                                                       uncovered = "uncovered" %in% input$soil_covergroups,
-                                                                       all_cover_type = "by_type" %in% input$soil_covergroups,
-                                                                       tall = input$soil_output_format == "long"),
-                                                        error = function(error){
-                                                          error
-                                                        })
-                          },
-                          "species" = {
-                            message("Calculating species counts from species richness")
-                            current_results <- tryCatch(species_count(data = workspace$calc_data,
-                                                                      species_var = input$species_species_var,
-                                                                      grouping_vars = input$species_grouping_vars,
-                                                                      tall = input$species_output_format == "long"),
-                                                        error = function(error){
-                                                          error
-                                                        })
-                          })
+                                                                    collapse = ", ")))
+                                               message(paste0("The length of height_grouping_vars_vector is ",
+                                                              length(height_grouping_vars_vector)))
+                                               
+                                               
+                                               current_height_vars <- names(workspace$calc_data)
+                                               missing_height_grouping_vars <- setdiff(x = height_grouping_vars_vector,
+                                                                                       y = current_height_vars)
+                                               available_height_grouping_vars <- intersect(x = height_grouping_vars_vector,
+                                                                                           y = current_height_vars)
+                                               
+                                               if (length(missing_height_grouping_vars) > 1) {
+                                                 missing_height_grouping_vars_warning <- paste0("The following variables are missing: ",
+                                                                                                paste(missing_height_grouping_vars,
+                                                                                                      collapse = ", "),
+                                                                                                ". Results will be calculated without grouping.")
+                                                 showNotification(ui = missing_height_grouping_vars_warning,
+                                                                  duration = NULL,
+                                                                  closeButton = TRUE,
+                                                                  id = "missing_height_grouping_vars",
+                                                                  type = "warning")
+                                                 indicator_vars <- NULL
+                                               } else {
+                                                 indicator_vars <- available_height_grouping_vars
+                                               }
+                                               
+                                               current_results <- tryCatch(terradactyl::mean_height(height_tall = workspace$calc_data,
+                                                                                                    method = 'mean',
+                                                                                                    omit_zero = input$height_omit_zero,
+                                                                                                    by_line = input$height_unit == "line",
+                                                                                                    tall = input$height_output_format == "long",
+                                                                                                    indicator_variables = indicator_vars),
+                                                                           error = function(error){
+                                                                             error
+                                                                           })
+                                               
+                                               current_results
+                                             },
+                                             "soilstability" = {
+                                               message("Calculating soil stability")
+                                               current_results <- tryCatch(terradactyl::soil_stability(soil_stability_tall = workspace$calc_data,
+                                                                                                       all = "all" %in% input$soil_covergroups,
+                                                                                                       cover = "covered" %in% input$soil_covergroups,
+                                                                                                       uncovered = "uncovered" %in% input$soil_covergroups,
+                                                                                                       all_cover_type = "by_type" %in% input$soil_covergroups,
+                                                                                                       tall = input$soil_output_format == "long"),
+                                                                           error = function(error){
+                                                                             error
+                                                                           })
+                                               current_results
+                                             },
+                                             "species" = {
+                                               message("Calculating species counts from species richness")
+                                               current_results <- tryCatch(species_count(data = workspace$calc_data,
+                                                                                         species_var = input$species_species_var,
+                                                                                         indicator_variables = input$species_grouping_vars),
+                                                                           error = function(error){
+                                                                             error
+                                                                           })
+                                               current_results
+                                             })
                    
                    message(paste0("class(current_results) is: ",
                                   paste0(class(current_results),

@@ -1,3 +1,4 @@
+#### Initialization ############################################################
 library(shiny)
 library(dplyr)
 library(DT)
@@ -10,6 +11,16 @@ library(shinyjs)
 library(trex)
 library(terradactyl)
 source("functions.R")
+
+
+# terradactyl_scripts <- list.files(path = "terradactyl",
+#                                   pattern = "R$")
+# message("Loading terradactyl scripts")
+# for (script in terradactyl_scripts) {
+#   source(paste0("terradactyl/", script))
+# }
+# message("terradactyl scripts loaded")
+# options(shiny.maxRequestSize = 3000 * 1024^2)
 
 # Define UI for application
 ui <- fluidPage(
@@ -196,14 +207,17 @@ ui <- fluidPage(
                  tags$div(id = "fetch_and_busy_container",
                           tags$div(id = "fetch_button_container",
                                    HTML("<center>"),
-                                   uiOutput("fetch_ui1"),
+                                   uiOutput("fetch_ui"),
                                    HTML("</center>"),
-                                   HTML("<center>"),
-                                   uiOutput("fetch_ui2"),
-                                   HTML("</center>"),
-                                   HTML("<center>"),
-                                   uiOutput("fetch_ui3"),
-                                   HTML("</center>"),
+                                   # HTML("<center>"),
+                                   # uiOutput("fetch_ui1"),
+                                   # HTML("</center>"),
+                                   # HTML("<center>"),
+                                   # uiOutput("fetch_ui2"),
+                                   # HTML("</center>"),
+                                   # HTML("<center>"),
+                                   # uiOutput("fetch_ui3"),
+                                   # HTML("</center>"),
                                    uiOutput("data_available_ui")
                           ),
                           conditionalPanel(
@@ -802,9 +816,10 @@ ui <- fluidPage(
 server <- function(input, output, session) {
   ##### Intialization #####
   # Allow for wonking big files
-  options(shiny.maxRequestSize = 30 * 1024^2)
+  options(shiny.maxRequestSize = 3000 * 1024^2)
   
-  # This is dangerous, but I'm doing it anyway so that polygons work consistently
+  # This is slightly dangerous, but I'm doing it anyway so that polygons work
+  # consistently
   sf::sf_use_s2(FALSE)
   
   # Our workspace list for storing stuff
@@ -1101,6 +1116,80 @@ server <- function(input, output, session) {
                        "Please use the buttons found on the left side of the map to draw your polygon boundary."))
   })
   
+  observeEvent(eventExpr = list(input$query_method,
+                                input$keys,
+                                input$ldc_no_credentials_confirmation,
+                                input$ldc_credentials_email,
+                                input$ldc_credentials_password,
+                                input$polygon_source,
+                                input$polygons_layer,
+                                workspace$drawn_polygon_sf),
+               handlerExpr = {
+                 message("Considering whether to render the fetch button.")
+                 
+                 if (req(input$query_method) %in% c("EcologicalSiteID", "PrimaryKey", "ProjectKey")) {
+                   message(paste0("query_method is ", input$query_method))
+                   if (req(input$keys) != "") {
+                     message(paste0("keys is ", input$keys))
+                     fetch_ready <- TRUE
+                   } else {
+                     message("No valid keys value. Holding off on rendering the fetch button.")
+                     fetch_ready <- FALSE
+                   }
+                 } else {
+                   message("stupid")
+                 }
+                 message("Still considering whether to render the fetch button.")
+                 if (req(input$query_method) == "spatial") {
+                   message(paste0("query_method is ", input$query_method))
+                   if (req(input$polygon_source) == "upload" & req(input$polygons_layer) != "") {
+                     message(paste0("The polygon_source is 'upload' and polygons_layer is ",
+                                    input$polygons_layer))
+                     fetch_ready <- TRUE
+                   } else if (req(input$polygon_source) == "draw" & !is.null(req(workspace$drawn_polygon_sf))) {
+                     message("The polygon_source is 'draw' and drawn_polygon_sf is not NULL.")
+                     fetch_ready <- TRUE
+                   } else {
+                     fetch_ready <- FALSE
+                   }
+                 } else {
+                   message("still stupid")
+                 }
+                 message(paste0("fetch_ready is ", fetch_ready))
+                 if (fetch_ready) {
+                   message("Checking out credential situation.")
+                   
+                   if (req(input$data_source) %in% c("ldc")) {
+                     message("The user wants to query for sure. Evaluating to see if credentials look good enough.")
+                     if (req(input$ldc_no_credentials_confirmation)) {
+                       message("No credentials provided. Rendering fetch button.")
+                       output$fetch_ui <- renderUI(expr = tagList(br(),
+                                                                  actionButton(inputId = "fetch_data",
+                                                                               label = "Fetch data")))
+                     } else {
+                       # These are obviously not stringent, but I'm also unclear
+                       # on if the username will always be an email address so
+                       # this is just covering other cases instead of requiring
+                       # a true email format.
+                       has_vaid_looking_email <-  nchar(input$ldc_credentials_email) > 4
+                       has_valid_looking_password <- nchar(input$ldc_credentials_password) > 0
+                       if (has_valid_looking_email & has_valid_looking_password) {
+                         message("Credentials look valid enough to render the fetch button. Rendering now.")
+                         output$fetch_ui <- renderUI(expr = tagList(br(),
+                                                                    actionButton(inputId = "fetch_data",
+                                                                                 label = "Fetch data")))
+                       } else {
+                         message("Credentials don't look valid enough to render the fetch button. Skipping rendering for now.")
+                         output$fetch_ui <- NULL
+                       }
+                     }
+                   } else {
+                     message("Data are going to be uploaded. No need to check credentials or render the fetch button.")
+                     output$fetch_ui <- NULL
+                   }
+                 }
+               })
+  
   # Add a fetch button when grabbing data from the LDC and the query criteria
   # are available
   # Apparently since the tool will never have input$keys and input$polygons_layer
@@ -1109,6 +1198,7 @@ server <- function(input, output, session) {
   # they'll never come into conflict
   # output$fetch_ui1 <- renderUI(expr = if (req(input$query_method %in% c("EcologicalSiteID", "PrimaryKey", "ProjectKey") & input$keys != "")) {
   #   message("Checking to see if it's time to render the fetch button.")
+  #   message(paste0("query_method is ",input$query_method, " and the key value isn't just ''. Checking what's up with credentials."))
   #   # if (input$ldc_no_credentials_confirmation) {
   #   #   message("No need for credentials. Rendering fetch button.")
   #   #   tagList(br(),
@@ -1642,7 +1732,8 @@ server <- function(input, output, session) {
                                             "If you want to add additional information about species to the data (e.g., conservation status, forage quality, functional group) you can join a lookup table to the data.",
                                             br(),
                                             br(),
-                                            "The built-in lookup tables are one tblNationalPlants which is used by the BLM to produce the values in the Terrestrial AIM Database (TerrADat) and one derived from USDA Plants which has been simplified to include only the most persistent value for growth habits and durations for species that may be associated with multiple, e.g. only 'perennial' when the species may be perennial in some regions and annual in others.",
+                                            "The Terrestrial AIM table is maintained by the BLM and is used for calculating indicators in the BLM Terrestrial AIM Database (TerrADat). This is the recommended built-in list to use.",
+                                            "The table derived from the USDA Plants includes growth habit and duration for all species in the database. Note that many species may be listed in USDA Plants as having multiple growth habits or durations but the lookup table only includes one for each, the more persistent option.",
                                             br(),
                                             br(),
                                             "If you have other attributes to add or wish to specify different growth habits and durations for species, you can instead upload a lookup table as a CSV. It must have a variable for the species code and only one observation/row per species code.",
@@ -2488,7 +2579,7 @@ server <- function(input, output, session) {
                  species_data_code_vars <- c("usda" = "code",
                                              "tblnationalplants" = "NameCode")
                  if (any(species_data_code_vars %in% current_species_data_vars)) {
-                   message("Found 'code' in the species data. Setting that as the species_joining_var")
+                   message("Found one of the default code variables in the species data. Setting that as the species_joining_var")
                    selection <- intersect(x = species_data_code_vars,
                                           y = current_species_data_vars)[1]
                  } else {
@@ -2560,9 +2651,7 @@ server <- function(input, output, session) {
                  # Set this variable so we can handle the data appropriately based on source
                  # Since there are from the LDC, we'll also be looking for header info
                  workspace$current_data_source <- "ldc"
-                 message("Data source set to LDC")
-                 
-                 
+                 message("Data source set to LDC")                 
                  
                  if (input$query_method != "spatial") {
                    message("Nullifying workspace$mapping_polygons for mapping reasons")
@@ -3695,7 +3784,8 @@ server <- function(input, output, session) {
                    
                    message("output$results_table rendered")
                    software_version_string <- paste0("These results were calculated using terradactyl v",
-                                                     packageVersion("terradactyl"),
+                                                     # packageVersion("terradactyl"),
+                                                     "1.1.0",
                                                      " and R v",
                                                      R.Version()$major, ".", R.Version()$minor,
                                                      " on ",

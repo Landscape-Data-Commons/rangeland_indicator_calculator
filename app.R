@@ -2480,9 +2480,12 @@ server <- function(input, output, session) {
                  
                  message("Attempting to update the selected variables in the species data")
                  # For the joining variable
-                 if ("code" %in% current_species_data_vars) {
+                 species_data_code_vars <- c("usda" = "code",
+                                             "tblnationalplants" = "NameCode")
+                 if (any(species_data_code_vars %in% current_species_data_vars)) {
                    message("Found 'code' in the species data. Setting that as the species_joining_var")
-                   selection <- "code"
+                   selection <- intersect(x = species_data_code_vars,
+                                          y = current_species_data_vars)[1]
                  } else {
                    message("Setting species_joining_var to ''")
                    selection <- ""
@@ -2495,18 +2498,31 @@ server <- function(input, output, session) {
                  
                  # For the growth habit variable
                  # We'll guess at the two most common options before giving up
-                 if ("GrowthHabitSub" %in% current_species_data_vars) {
-                   message("Found 'GrowthHabitSub' in the species data. Setting that as growth_habit_var")
-                   selection <- "GrowthHabitSub"
-                 } else if ("growth_habit" %in% current_species_data_vars) {
-                   message("Found 'growth_habit' in the species data. Setting that as growth_habit_var")
-                   selection <- "growth_habit"
+                 if (any(c("growth_habit", "growthhabit", "GrowthHabit") %in% current_species_data_vars)) {
+                   message("Found growth habit variable in the species data. Setting that as growth_habit_var")
+                   selection <- intersect(x = c("growth_habit", "growthhabit", "GrowthHabit"),
+                                          y = current_species_data_vars)[1]
                  } else {
                    message("Setting growth_habit_var to ''")
                    selection <- ""
                  }
                  updateSelectInput(session = session,
                                    inputId = "growth_habit_var",
+                                   choices = c("",
+                                               current_species_data_vars),
+                                   selected = selection)
+                 
+                 if (any(c("growth_habit_sub", "growthhabitsub", "GrowthHabitSub") %in% current_species_data_vars)) {
+                   message("Found growth habit subcategory variable in the species data. Setting that as growth_habit_sub_var")
+                   selection <- intersect(x = c("growth_habit_sub", "growthhabitsub", "GrowthHabitSub"),
+                                          y = current_species_data_vars)[1]
+                 } else {
+                   message("Setting growth_habit_sub_var to ''")
+                   selection <- ""
+                 }
+                 
+                 updateSelectInput(session = session,
+                                   inputId = "growth_habit_sub_var",
                                    choices = c("",
                                                current_species_data_vars),
                                    selected = selection)
@@ -3035,8 +3051,8 @@ server <- function(input, output, session) {
                                         closeButton = TRUE,
                                         id = "no_data_for_generics_error",
                                         type = "error")
-                     } else if (input$growth_habit_var == "" | input$duration_var == "") {
-                       showNotification(ui = "You must specify the growth habit and duration variables in order to add generic species codes.",
+                     } else if (input$growth_habit_var == "" | input$growth_habit_sub_var == "" | input$duration_var == "") {
+                       showNotification(ui = "You must specify the growth habit, growth habit subcategory, and duration variables in order to add generic species codes.",
                                         duration = NULL,
                                         closeButton = TRUE,
                                         type = "error",
@@ -3046,22 +3062,24 @@ server <- function(input, output, session) {
                        message("Getting ready to add generic codes")
                        message(paste0("length(workspace$data) is ",
                                       length(workspace$data)))
-                       species_list_with_generics <- unique(terradactyl::generic_growth_habits(data = workspace$data,
-                                                                                               data_code = input$data_joining_var,
-                                                                                               species_list = workspace$species_data,
-                                                                                               species_code = input$species_joining_var,
-                                                                                               species_growth_habit_code = input$growth_habit_var,
-                                                                                               species_duration = input$duration_var))
+                       species_list_with_generics <- unique(generic_growth_habits(data = workspace$data,
+                                                                                  data_code = input$data_joining_var,
+                                                                                  species_list = workspace$species_data,
+                                                                                  species_code = input$species_joining_var,
+                                                                                  species_growthhabit = input$growth_habit_var,
+                                                                                  species_growthhabitsub = input$growth_habit_sub_var,
+                                                                                  species_duration = input$duration_var,
+                                                                                  verbose = TRUE))
                        # Make sure that the growth habit and duration information is
                        # in the correct variables.
                        # Which indices have the attributed generic codes?
-                       unknown_indices <- is.na(species_list_with_generics[[input$growth_habit_var]]) & !is.na(species_list_with_generics[["GrowthHabitSub"]])
+                       unknown_indices <- is.na(species_list_with_generics[[input$growth_habit_var]]) & !is.na(species_list_with_generics[[input$growth_habit_var]])
                        
                        # At those indices, write in the growth habit and duration info
                        # from the default variables to the user's selected variables
                        if (any(unknown_indices)) {
-                         species_list_with_generics[[input$growth_habit_var]][unknown_indices] <- as.character(species_list_with_generics[["GrowthHabitSub"]][unknown_indices])
-                         species_list_with_generics[[input$duration_var]][unknown_indices] <- as.character(species_list_with_generics[["Duration"]][unknown_indices])
+                         species_list_with_generics[[input$growth_habit_var]][unknown_indices] <- as.character(species_list_with_generics[[input$growth_habit_var]][unknown_indices])
+                         species_list_with_generics[[input$duration_var]][unknown_indices] <- as.character(species_list_with_generics[[input$duration_var]][unknown_indices])
                        }
                        
                        # Reduce to only the variables we had coming into this
@@ -3247,7 +3265,7 @@ server <- function(input, output, session) {
                      if (current_var_value != "") {
                        message(paste0("Writing contents of worskpace$calc_data$",
                                       current_var_value,
-                                      " to workspace$data$",
+                                      " to workspace$calc_data$",
                                       required_var))
                        workspace$calc_data[[required_var]] <- workspace$calc_data[[current_var_value]]
                      } else {
@@ -3257,291 +3275,308 @@ server <- function(input, output, session) {
                    }
                    
                    message("Calculating!")
-                   switch(input$data_type,
-                          "lpi" = {
-                            message("Calculating cover from LPI.")
-                            
-                            if (input$lpi_hit %in% c("any", "first", "basal")) {
-                              message("This is a generalized LPI calc and will use pct_cover()")
-                              # Handle the grouping variables (if any)!
-                              message("input$lpi_grouping_vars is:")
-                              message(input$lpi_grouping_vars)
-                              
-                              current_lpi_grouping_vars <- input$lpi_grouping_vars
-                              current_lpi_grouping_vars <- current_lpi_grouping_vars[!(current_lpi_grouping_vars %in% c(""))]
-                              
-                              if (length(current_lpi_grouping_vars) > 0) {
-                                lpi_grouping_vars_vector <- current_lpi_grouping_vars
-                                
-                                message("There are grouping variables.")
-                                current_lpi_vars <- names(workspace$calc_data)
-                                missing_lpi_grouping_vars <- lpi_grouping_vars_vector[!(lpi_grouping_vars_vector %in% current_lpi_vars)]
-                                available_lpi_grouping_vars <- lpi_grouping_vars_vector[lpi_grouping_vars_vector %in% current_lpi_vars]
-                                
-                                if (length(missing_lpi_grouping_vars) < 1) {
-                                  message("No variables missing!")
-                                  lpi_cover_string <- paste0("tryCatch(terradactyl::pct_cover(",
-                                                             "lpi_tall = workspace$calc_data,",
-                                                             "tall = input$lpi_output_format == 'long',",
-                                                             "hit = input$lpi_hit,",
-                                                             "by_line = input$lpi_unit == 'line',",
-                                                             paste(lpi_grouping_vars_vector,
-                                                                   collapse = ","),
-                                                             "),error = function(error){error})")
-                                } else {
-                                  message("Missing one or more variables.")
-                                  missing_lpi_grouping_vars_warning <- paste0("The following variables are missing: ",
-                                                                              paste(missing_lpi_grouping_vars,
-                                                                                    collapse = ", "),
-                                                                              ". Results will be calculated without grouping.")
-                                  showNotification(ui = missing_lpi_grouping_vars_warning,
-                                                   duration = NULL,
-                                                   closeButton = TRUE,
-                                                   id = "missing_lpi_grouping_vars",
-                                                   type = "warning")
-                                  lpi_cover_string <- paste0("tryCatch(terradactyl::pct_cover(",
-                                                             "lpi_tall = workspace$calc_data,",
-                                                             "tall = input$lpi_output_format == 'long',",
-                                                             "hit = input$lpi_hit,",
-                                                             "by_line = input$lpi_unit == 'line'",
-                                                             "),error = function(error){error})")
-                                }
-                                
-                              } else {
-                                message("No grouping variables.")
-                                lpi_cover_string <- paste0("tryCatch(terradactyl::pct_cover(",
-                                                           "lpi_tall = workspace$calc_data,",
-                                                           "tall = input$lpi_output_format == 'long',",
-                                                           "hit = input$lpi_hit,",
-                                                           "by_line = input$lpi_unit == 'line'",
-                                                           "),error = function(error){error})")
-                              }
-                            } else {
-                              message("This is a specialized LPI call and will be using a wrapper for pct_cover()")
-                              switch(input$lpi_hit,
-                                     "species" = {
-                                       lpi_cover_string <- paste0("tryCatch(terradactyl::pct_cover_species(",
-                                                                  "lpi_tall = workspace$calc_data,",
-                                                                  "tall = input$lpi_output_format == 'long',",
-                                                                  "by_line = input$lpi_unit == 'line'",
-                                                                  "),error = function(error){error})")
-                                     },
-                                     "bare_ground" = {
-                                       lpi_cover_string <- paste0("tryCatch(terradactyl::pct_cover_bare_soil(",
-                                                                  "lpi_tall = workspace$calc_data,",
-                                                                  "tall = input$lpi_output_format == 'long',",
-                                                                  "by_line = input$lpi_unit == 'line'",
-                                                                  "),error = function(error){error})")
-                                     },
-                                     "litter" = {
-                                       lpi_cover_string <- paste0("tryCatch(terradactyl::pct_cover_litter(",
-                                                                  "lpi_tall = workspace$calc_data,",
-                                                                  "tall = input$lpi_output_format == 'long',",
-                                                                  "by_line = input$lpi_unit == 'line'",
-                                                                  "),error = function(error){error})")
-                                     },
-                                     "between_plant" = {
-                                       lpi_cover_string <- paste0("tryCatch(terradactyl::pct_cover_between_plant(",
-                                                                  "lpi_tall = workspace$calc_data,",
-                                                                  "tall = input$lpi_output_format == 'long',",
-                                                                  "by_line = input$lpi_unit == 'line'",
-                                                                  "),error = function(error){error})")
-                                     },
-                                     "total_foliar" = {
-                                       lpi_cover_string <- paste0("tryCatch(terradactyl::pct_cover_total_foliar(",
-                                                                  "lpi_tall = workspace$calc_data,",
-                                                                  "tall = input$lpi_output_format == 'long',",
-                                                                  "by_line = input$lpi_unit == 'line'",
-                                                                  "),error = function(error){error})")
-                                     },
-                                     "nonplant_ground" = {
-                                       lpi_cover_string <- paste0("tryCatch(terradactyl::pct_cover_all_ground(",
-                                                                  "lpi_tall = workspace$calc_data,",
-                                                                  "tall = input$lpi_output_format == 'long',",
-                                                                  "by_line = input$lpi_unit == 'line'",
-                                                                  "),error = function(error){error})")
-                                     })
-                            }
-                            
-                            message("The function call is:")
-                            message(lpi_cover_string)
-                            current_results <- eval(parse(text = lpi_cover_string))
-                          },
-                          "gap" = {
-                            message("Calculating gaps.")
-                            current_gap_breaks <- stringr::str_split(string = input$gap_breaks,
-                                                                     pattern = ",",
-                                                                     simplify = TRUE)
-                            current_gap_breaks <- as.numeric(trimws(current_gap_breaks))
-                            
-                            if (any(is.na(current_gap_breaks))) {
-                              message("At least one of the gap breakpoints isn't numeric!")
-                              gap_results <- "One or more of the gap breakpoints is non-numeric. Please provide the gap breaks separated by commas."
-                            } else if (length(input$gap_indicator_types) < 1) {
-                              message("No indicator type selected")
-                              gap_results <- "No indicator types selected to calculate."
-                            } else {
-                              message("Gap breaks are all good and at least one indicator type is selected")
-                              message("Calculating gap")
-                              gap_results <- tryCatch(terradactyl::gap_cover(gap_tall = workspace$calc_data,
-                                                                             tall = input$gap_output_format == "long",
-                                                                             breaks = current_gap_breaks,
-                                                                             type = input$gap_type,
-                                                                             by_line = (input$gap_unit == "line")),
-                                                      error = function(error){
-                                                        error
-                                                      })
-                              gap_results <- gap_results[input$gap_indicator_types]
-                              message(paste0("Remaining names of gap results are: ",
-                                             paste(names(gap_results),
-                                                   collapse = ", ")))
-                              message(head(gap_results))
-                              message("Gaps calculated")
-                            }
-                            
-                            
-                            
-                            # Only if we actually calculated anything!
-                            if (any(sapply(gap_results, is.null))) {
-                              showNotification(ui = "The incoming data were malformed and no results could be calculated.",
-                                               duration = NULL,
-                                               closeButton = TRUE,
-                                               id = "gap_data_malformed_warning",
-                                               type = "error")
-                              current_results <- NULL
-                            } else if (!is.character(gap_results)) {
-                              message("Gap results aren't character")
-                              # Apparently gap_cover() returns a list of data frames
-                              # when tall = FALSE so let's combine them
-                              if (input$gap_output_format == "wide") {
-                                # First up is to rename the variables using the stats
-                                for (index in seq_len(length(gap_results))) {
-                                  current_stat <- names(gap_results)[index]
-                                  current_vars <- names(gap_results[[index]])
-                                  gap_class_var_indices <- grepl(current_vars,
-                                                                 pattern = "\\d|NoGap")
-                                  gap_class_vars <- current_vars[gap_class_var_indices]
-                                  names(gap_results[[index]])[gap_class_var_indices] <- paste0(gap_class_vars,
-                                                                                               "_",
-                                                                                               current_stat)
-                                }
-                                # Then mash them together
-                                current_results <- Reduce(f = dplyr::full_join,
-                                                          x = gap_results)
-                              } else {
-                                # If the results are long, we're already ready to go
-                                current_results <- do.call(rbind,
-                                                           gap_results)
-                              }
-                            } else {
-                              message("Gap results are an error message")
-                              current_results <- gap_results
-                            }
-                            
-                          },
-                          "height" = {
-                            message("Handling grouping variables")
-                            # Handle the grouping variables (if any)!
-                            height_grouping_vars_vector <- stringr::str_split(string = input$height_grouping_vars,
-                                                                              pattern = ",",
-                                                                              simplify = TRUE)
-                            height_grouping_vars_vector <- as.vector(height_grouping_vars_vector)
-                            height_grouping_vars_vector <- trimws(height_grouping_vars_vector)
-                            
-                            # Total bandaid
-                            if (length(height_grouping_vars_vector) < 1) {
-                              height_grouping_vars_vector <- ""
-                            }
-                            
-                            message(paste0("Current height_grouping_vars_vector is: ",
-                                           paste(height_grouping_vars_vector,
-                                                 collapse = ", ")))
-                            message(paste0("The length of height_grouping_vars_vector is ",
-                                           length(height_grouping_vars_vector)))
-                            
-                            height_by_line <- input$height_unit == "line"
-                            output_tall <- input$height_output_format == "long"
-                            
-                            if (!("" %in% height_grouping_vars_vector)) {
-                              message("There are grouping variables!")
-                              current_height_vars <- names(workspace$calc_data)
-                              missing_height_grouping_vars <- height_grouping_vars_vector[!(height_grouping_vars_vector %in% current_height_vars)]
-                              available_height_grouping_vars <- height_grouping_vars_vector[height_grouping_vars_vector %in% current_height_vars]
-                              message(paste0("missing_height_grouping_vars is currently: ",
-                                             paste(missing_height_grouping_vars,
-                                                   collapse = ", ")))
-                              
-                              if (length(missing_height_grouping_vars) < 1) {
-                                height_cover_string <- paste0("tryCatch(terradactyl::mean_height(",
-                                                              "height_tall = workspace$calc_data,",
-                                                              "method = 'mean',",
-                                                              "omit_zero = input$height_omit_zero,",
-                                                              "by_line = height_by_line,",
-                                                              "tall = output_tall,",
+                   current_results <- switch(input$data_type,
+                                             "lpi" = {
+                                               message("Calculating cover from LPI.")
+                                               
+                                               if (input$lpi_hit %in% c("any", "first", "basal")) {
+                                                 message("This is a generalized LPI calc and will use pct_cover()")
+                                                 # Handle the grouping variables (if any)!
+                                                 message("input$lpi_grouping_vars is:")
+                                                 message(input$lpi_grouping_vars)
+                                                 
+                                                 current_lpi_grouping_vars <- setdiff(x = input$lpi_grouping_vars,
+                                                                                      y = c(""))
+                                                 
+                                                 if (length(current_lpi_grouping_vars) > 0) {
+                                                   lpi_grouping_vars_vector <- current_lpi_grouping_vars
+                                                   
+                                                   message("There are grouping variables.")
+                                                   current_lpi_vars <- names(workspace$calc_data)
+                                                   missing_lpi_grouping_vars <- setdiff(x = lpi_grouping_vars_vector,
+                                                                                        y = current_lpi_vars)
+                                                   available_lpi_grouping_vars <- intersect(x = lpi_grouping_vars_vector,
+                                                                                            y = current_lpi_vars)
+                                                   
+                                                   if (length(missing_lpi_grouping_vars) < 1) {
+                                                     message("No variables missing!")
+                                                     indicator_vars <-  available_lpi_grouping_vars
+                                                   } else {
+                                                     message("Missing one or more variables.")
+                                                     missing_lpi_grouping_vars_warning <- paste0("The following variables are missing: ",
+                                                                                                 paste(missing_lpi_grouping_vars,
+                                                                                                       collapse = ", "),
+                                                                                                 ". Results will be calculated without grouping.")
+                                                     showNotification(ui = missing_lpi_grouping_vars_warning,
+                                                                      duration = NULL,
+                                                                      closeButton = TRUE,
+                                                                      id = "missing_lpi_grouping_vars",
+                                                                      type = "warning")
+                                                     indicator_vars <- NULL
+                                                   }
+                                                   
+                                                 } else {
+                                                   message("No grouping variables.")
+                                                   indicator_vars <- NULL
+                                                 }
+                                                 glimpse(workspace$calc_data)
+                                                 current_results <- tryCatch(expr = pct_cover(lpi_tall = workspace$calc_data,
+                                                                                              tall = input$lpi_output_format == "long",
+                                                                                              hit = input$lpi_hit,
+                                                                                              by_line = input$lpi_unit == "line",
+                                                                                              indicator_variables = indicator_vars,
+                                                                                              verbose = TRUE),
+                                                                             error = function(error){
+                                                                               error
+                                                                             })
+                                               } else {
+                                                 message("This is a specialized LPI call and will be using a wrapper for pct_cover()")
+                                                 
+                                                 if (input$lpi_hit == "total foliar") {
+                                                   current_data <- workspace$calc_data |>
+                                                     dplyr::rename(.data = _,
+                                                                   tidyselect::any_of(x = setNames(object = c(input$code_var,
+                                                                                                              input$growth_habit_var,
+                                                                                                              input$growth_habit_sub_var,
+                                                                                                              input$duration_var),
+                                                                                                   nm = c("code",
+                                                                                                          "GrowthHabit",
+                                                                                                          "GrowthHabitSub",
+                                                                                                          "Duration"))))
+                                                   
+                                                   if ("GrowthHabit" %in% names(current_data)) {
+                                                     message("Adding Plant variable using code and GrowthHabit")
+                                                     current_data <- dplyr::mutate(.data = current_data,
+                                                                                   Plant = dplyr::case_when(GrowthHabit != "Nonvascular" &
+                                                                                                              stringi::stri_length(code) >= 3 ~ "Plant",
+                                                                                                            .default = NA))
+                                                   } else {
+                                                     message("Adding Plant variable using code")
+                                                     current_data <- dplyr::mutate(.data = current_data,
+                                                                                   Plant = dplyr::case_when(stringi::stri_length(code) >= 3 ~ "Plant",
+                                                                                                            .default = NA))
+                                                   }
+                                                   
+                                                   current_results <- tryCatch(expr = pct_cover(lpi_tall = current_data,
+                                                                                                tall = TRUE,
+                                                                                                hit = "any",
+                                                                                                by_line = FALSE,
+                                                                                                indicator_variables = "Plant"),
+                                                                               error = function(error){
+                                                                                 error
+                                                                               })
+                                                   
+                                                   if ("data.frame" %in% class(current_results)) {
+                                                     current_results <- dplyr::mutate(.data = current_results,
+                                                                                      indicator = "TotalFoliarCover")
+                                                     if (input$lpi_output_format != "long") {
+                                                       current_results <- tidyr::pivot_wider(data = current_results,
+                                                                                             names_from = indicator,
+                                                                                             values_from = percent)
+                                                     }
+                                                   }
+                                                   
+                                                   
+                                                 } else {
+                                                   workspace$calc_data |>
+                                                     dplyr::rename(.data = _,
+                                                                   tidyselect::any_of(x = setNames(object = c(input$code_var,
+                                                                                                              input$growth_habit_var,
+                                                                                                              input$growth_habit_sub_var,
+                                                                                                              input$duration_var),
+                                                                                                   nm = c("code",
+                                                                                                          "GrowthHabit",
+                                                                                                          "GrowthHabitSub",
+                                                                                                          "Duration")))) |>
+                                                     glimpse()
+                                                   current_results <- tryCatch(expr = pct_cover_indicators(lpi_tall = workspace$calc_data |>
+                                                                                                             dplyr::rename(.data = _,
+                                                                                                                           tidyselect::any_of(x = setNames(object = c(input$code_var,
+                                                                                                                                                                      input$growth_habit_var,
+                                                                                                                                                                      input$growth_habit_sub_var,
+                                                                                                                                                                      input$duration_var),
+                                                                                                                                                           nm = c("code",
+                                                                                                                                                                  "GrowthHabit",
+                                                                                                                                                                  "GrowthHabitSub",
+                                                                                                                                                                  "Duration")))),
+                                                                                                           indicator_families = input$lpi_hit,
+                                                                                                           tall_output = setNames(object = input$lpi_output_format == "long",
+                                                                                                                                  nm = input$lpi_hit),
+                                                                                                           by_line = input$lpi_unit == "line",
+                                                                                                           hit_type = c(live = "any",
+                                                                                                                        species = "any"),
+                                                                                                           indicator_variables = list(`total foliar` = "code",
+                                                                                                                                      ground = "code",
+                                                                                                                                      `between plant` = "code",
+                                                                                                                                      `bare soil` = "code",
+                                                                                                                                      litter = "code",
+                                                                                                                                      live = c("chckbox",
+                                                                                                                                               "code"),
+                                                                                                                                      species = "code"),
+                                                                                                           verbose = TRUE,
+                                                                                                           digits = 6)[[1]],
+                                                                               error = function(error){
+                                                                                 error
+                                                                               })
+                                                 }
+                                               }
+                                               
+                                               
+                                               
+                                               current_results  
+                                             },
+                                             "gap" = {
+                                               message("Calculating gaps.")
+                                               current_gap_breaks <- stringr::str_split(string = input$gap_breaks,
+                                                                                        pattern = ",",
+                                                                                        simplify = TRUE)
+                                               current_gap_breaks <- as.numeric(trimws(current_gap_breaks))
+                                               
+                                               if (any(is.na(current_gap_breaks))) {
+                                                 message("At least one of the gap breakpoints isn't numeric!")
+                                                 current_results <- "One or more of the gap breakpoints is non-numeric. Please provide the gap breaks separated by commas."
+                                               } else if (length(input$gap_indicator_types) < 1) {
+                                                 message("No indicator type selected")
+                                                 current_results <- "No indicator types selected to calculate."
+                                               } else {
+                                                 message("Gap breaks are all good and at least one indicator type is selected")
+                                                 message("Calculating gap")
+                                                 current_results <- tryCatch(terradactyl::gap_cover(gap_tall = workspace$calc_data,
+                                                                                                    tall = input$gap_output_format == "long",
+                                                                                                    breaks = current_gap_breaks,
+                                                                                                    type = input$gap_type,
+                                                                                                    by_line = (input$gap_unit == "line"),
+                                                                                                    verbose = TRUE),
+                                                                             error = function(error){
+                                                                               error
+                                                                             })
+                                                 current_results <- current_results[input$gap_indicator_types]
+                                                 message(paste0("Remaining names of gap results are: ",
+                                                                paste(names(current_results),
+                                                                      collapse = ", ")))
+                                                 message(head(current_results))
+                                                 message("Gaps calculated")
+                                                 
+                                               }
+                                               
+                                               
+                                               
+                                               # Only if we actually calculated anything!
+                                               if (any(sapply(current_results, is.null))) {
+                                                 showNotification(ui = "The incoming data were malformed and no results could be calculated.",
+                                                                  duration = NULL,
+                                                                  closeButton = TRUE,
+                                                                  id = "gap_data_malformed_warning",
+                                                                  type = "error")
+                                                 current_results <- NULL
+                                               } else if (!is.character(current_results)) {
+                                                 message("Gap results aren't character")
+                                                 # Apparently gap_cover() returns a list of data frames
+                                                 # when tall = FALSE so let's combine them
+                                                 if (input$gap_output_format == "wide") {
+                                                   # First up is to rename the variables using the stats
+                                                   for (index in seq_len(length(current_results))) {
+                                                     current_stat <- names(current_results)[index]
+                                                     current_vars <- names(current_results[[index]])
+                                                     gap_class_var_indices <- grepl(current_vars,
+                                                                                    pattern = "\\d|NoGap")
+                                                     gap_class_vars <- current_vars[gap_class_var_indices]
+                                                     names(current_results[[index]])[gap_class_var_indices] <- paste0(gap_class_vars,
+                                                                                                                      "_",
+                                                                                                                      current_stat)
+                                                   }
+                                                   # Then mash them together
+                                                   current_results <- Reduce(f = dplyr::full_join,
+                                                                             x = current_results)
+                                                 } else {
+                                                   # If the results are long, we're already ready to go
+                                                   current_results <- dplyr::bind_rows(current_results)
+                                                 }
+                                               } else {
+                                                 message("Gap results are an error message")
+                                               }
+                                               
+                                               current_results
+                                             },
+                                             "height" = {
+                                               message("Handling grouping variables")
+                                               # Handle the grouping variables (if any)!
+                                               height_grouping_vars_vector <- stringr::str_split(string = input$height_grouping_vars,
+                                                                                                 pattern = ",",
+                                                                                                 simplify = TRUE) |>
+                                                 as.vector() |>
+                                                 trimws() |>
+                                                 setdiff(x = _,
+                                                         y = c(""))
+                                               
+                                               # Total bandaid. Unclear if still necessary
+                                               # if (length(height_grouping_vars_vector) < 1) {
+                                               #   height_grouping_vars_vector <- NULL
+                                               # }
+                                               
+                                               message(paste0("Current height_grouping_vars_vector is: ",
                                                               paste(height_grouping_vars_vector,
-                                                                    collapse = ","),
-                                                              "),error = function(error){error})"
-                                )
-                              } else {
-                                missing_height_grouping_vars_warning <- paste0("The following variables are missing: ",
-                                                                               paste(missing_height_grouping_vars,
-                                                                                     collapse = ", "),
-                                                                               ". Results will be calculated without grouping.")
-                                showNotification(ui = missing_height_grouping_vars_warning,
-                                                 duration = NULL,
-                                                 closeButton = TRUE,
-                                                 id = "missing_height_grouping_vars",
-                                                 type = "warning")
-                                height_cover_string <- paste0("tryCatch(terradactyl::mean_height(",
-                                                              "height_tall = workspace$calc_data,",
-                                                              "method = 'mean',",
-                                                              "omit_zero = input$height_omit_zero,",
-                                                              "by_line = height_by_line,",
-                                                              "tall = output_tall",
-                                                              "),error = function(error){error})"
-                                )
-                              }
-                              
-                            } else {
-                              message("No grouping vars!")
-                              height_cover_string <- paste0("tryCatch(terradactyl::mean_height(",
-                                                            "height_tall = workspace$calc_data,",
-                                                            "method = 'mean',",
-                                                            "omit_zero = input$height_omit_zero,",
-                                                            "by_line = height_by_line,",
-                                                            "tall = output_tall",
-                                                            "),error = function(error){error})"
-                              )
-                            }
-                            message("The function call is:")
-                            message(height_cover_string)
-                            message("Parsing")
-                            current_results <- eval(parse(text = height_cover_string))
-                            message("Parsed")
-                            
-                          },
-                          "soilstability" = {
-                            message("Calculating soil stability")
-                            current_results <- tryCatch(terradactyl::soil_stability(soil_stability_tall = workspace$calc_data,
-                                                                                    all = "all" %in% input$soil_covergroups,
-                                                                                    cover = "covered" %in% input$soil_covergroups,
-                                                                                    uncovered = "uncovered" %in% input$soil_covergroups,
-                                                                                    all_cover_type = "by_type" %in% input$soil_covergroups,
-                                                                                    tall = input$soil_output_format == "long"),
-                                                        error = function(error){
-                                                          error
-                                                        })
-                          },
-                          "species" = {
-                            message("Calculating species counts from species richness")
-                            current_results <- tryCatch(terradactyl::species_count(data = workspace$calc_data,
-                                                                                   species_var = input$species_species_var,
-                                                                                   grouping_vars = input$species_grouping_vars,
-                                                                                   tall = input$species_output_format == "long"),
-                                                        error = function(error){
-                                                          error
-                                                        })
-                          })
+                                                                    collapse = ", ")))
+                                               message(paste0("The length of height_grouping_vars_vector is ",
+                                                              length(height_grouping_vars_vector)))
+                                               
+                                               
+                                               current_height_vars <- names(workspace$calc_data)
+                                               missing_height_grouping_vars <- setdiff(x = height_grouping_vars_vector,
+                                                                                       y = current_height_vars)
+                                               available_height_grouping_vars <- intersect(x = height_grouping_vars_vector,
+                                                                                           y = current_height_vars)
+                                               
+                                               if (length(missing_height_grouping_vars) > 1) {
+                                                 missing_height_grouping_vars_warning <- paste0("The following variables are missing: ",
+                                                                                                paste(missing_height_grouping_vars,
+                                                                                                      collapse = ", "),
+                                                                                                ". Results will be calculated without grouping.")
+                                                 showNotification(ui = missing_height_grouping_vars_warning,
+                                                                  duration = NULL,
+                                                                  closeButton = TRUE,
+                                                                  id = "missing_height_grouping_vars",
+                                                                  type = "warning")
+                                                 indicator_vars <- NULL
+                                               } else {
+                                                 indicator_vars <- available_height_grouping_vars
+                                               }
+                                               
+                                               current_results <- tryCatch(terradactyl::mean_height(height_tall = workspace$calc_data,
+                                                                                                    method = 'mean',
+                                                                                                    omit_zero = input$height_omit_zero,
+                                                                                                    by_line = input$height_unit == "line",
+                                                                                                    tall = input$height_output_format == "long",
+                                                                                                    indicator_variables = indicator_vars),
+                                                                           error = function(error){
+                                                                             error
+                                                                           })
+                                               
+                                               current_results
+                                             },
+                                             "soilstability" = {
+                                               message("Calculating soil stability")
+                                               current_results <- tryCatch(terradactyl::soil_stability(soil_stability_tall = workspace$calc_data,
+                                                                                                       all = "all" %in% input$soil_covergroups,
+                                                                                                       cover = "covered" %in% input$soil_covergroups,
+                                                                                                       uncovered = "uncovered" %in% input$soil_covergroups,
+                                                                                                       all_cover_type = "by_type" %in% input$soil_covergroups,
+                                                                                                       tall = input$soil_output_format == "long"),
+                                                                           error = function(error){
+                                                                             error
+                                                                           })
+                                               current_results
+                                             },
+                                             "species" = {
+                                               message("Calculating species counts from species richness")
+                                               current_results <- tryCatch(species_count(data = workspace$calc_data,
+                                                                                         species_var = input$species_species_var,
+                                                                                         indicator_variables = input$species_grouping_vars),
+                                                                           error = function(error){
+                                                                             error
+                                                                           })
+                                               current_results
+                                             })
                    
                    message(paste0("class(current_results) is: ",
                                   paste0(class(current_results),

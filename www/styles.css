@@ -256,7 +256,7 @@ a, a:link, a:visited{
 
 /* Up the oomf factor of the fetch button */
 .fetch-button {
-  scale: 2;
+  scale: 1.7;
   animation: pulse 2s 1;
 }
 

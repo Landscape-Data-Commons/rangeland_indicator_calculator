@@ -925,8 +925,8 @@ server <- function(input, output, session) {
   })
   
   #### Guides ##################################################################
-  source("guides.R",
-         local = TRUE)
+  # source("guides.R",
+  #        local = TRUE)
   
   ###### Activate the Start tab tutorial #######################################
   observeEvent(eventExpr = input$getting_data_tutorial,

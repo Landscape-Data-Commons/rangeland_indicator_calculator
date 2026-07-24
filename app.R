@@ -8,19 +8,13 @@ library(leaflet)
 library(leaflet.extras)
 library(sf)
 library(shinyjs)
+# library(keyring)
+# library(raster)
+# library(terra)
 library(trex)
 library(terradactyl)
 source("functions.R")
 
-
-# terradactyl_scripts <- list.files(path = "terradactyl",
-#                                   pattern = "R$")
-# message("Loading terradactyl scripts")
-# for (script in terradactyl_scripts) {
-#   source(paste0("terradactyl/", script))
-# }
-# message("terradactyl scripts loaded")
-# options(shiny.maxRequestSize = 3000 * 1024^2)
 
 # Define UI for application
 ui <- fluidPage(
@@ -206,7 +200,7 @@ ui <- fluidPage(
                  # never coexist.
                  tags$div(id = "fetch_and_busy_container",
                           tags$div(id = "fetch_button_container",
-                                   
+                                   uiOutput("data_available_ui"),
                                    # HTML("<center>"),
                                    # uiOutput("fetch_ui1"),
                                    # HTML("</center>"),
@@ -215,8 +209,8 @@ ui <- fluidPage(
                                    HTML("</center>"),
                                    HTML("<center>"),
                                    uiOutput("fetch_ui3"),
-                                   HTML("</center>"),
-                                   uiOutput("data_available_ui")
+                                   HTML("</center>")
+                                   
                           ),
                           conditionalPanel(
                             condition = "$('html').hasClass('shiny-busy')",
@@ -931,8 +925,8 @@ server <- function(input, output, session) {
   })
   
   #### Guides ##################################################################
-  source("guides.R",
-         local = TRUE)
+  # source("guides.R",
+  #        local = TRUE)
   
   ###### Activate the Start tab tutorial #######################################
   observeEvent(eventExpr = input$getting_data_tutorial,
@@ -1220,7 +1214,10 @@ server <- function(input, output, session) {
     # if (req(input$ldc_no_credentials_confirmation) | (req(nchar(input$ldc_credentials_email) > 4 & nchar(input$ldc_credentials_password) > 0))) {
     tagList(br(),
             actionButton(inputId = "fetch_data",
-                         label = "Fetch data"))
+                         label = "Fetch data",
+                         icon = NULL,
+                         width = NULL,
+                         class = "fetch-button"))
     # }
   })
   output$fetch_ui3 <- renderUI(expr = if (req(input$query_method == "spatial" & input$polygon_source == "draw" & !is.null(workspace$drawn_polygon_sf))) {
@@ -1228,7 +1225,10 @@ server <- function(input, output, session) {
     # if (req(input$ldc_no_credentials_confirmation | (nchar(input$ldc_credentials_email) > 4 & nchar(input$ldc_credentials_password) > 0))) {
     tagList(br(),
             actionButton(inputId = "fetch_data",
-                         label = "Fetch data"))
+                         label = "Fetch data",
+                         icon = NULL,
+                         width = NULL,
+                         class = "fetch-button"))
     # }
   })
   

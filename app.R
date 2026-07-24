@@ -8,19 +8,13 @@ library(leaflet)
 library(leaflet.extras)
 library(sf)
 library(shinyjs)
+# library(keyring)
+# library(raster)
+# library(terra)
 library(trex)
 library(terradactyl)
 source("functions.R")
 
-
-# terradactyl_scripts <- list.files(path = "terradactyl",
-#                                   pattern = "R$")
-# message("Loading terradactyl scripts")
-# for (script in terradactyl_scripts) {
-#   source(paste0("terradactyl/", script))
-# }
-# message("terradactyl scripts loaded")
-# options(shiny.maxRequestSize = 3000 * 1024^2)
 
 # Define UI for application
 ui <- fluidPage(

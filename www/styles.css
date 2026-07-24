@@ -254,6 +254,12 @@ a, a:link, a:visited{
   font-size: large;
 }
 
+/* Up the oomf factor of the fetch button */
+.fetch-button {
+  scale: 2;
+  animation: pulse 2s 1;
+}
+
 /* Animation for the notification boxes */
 @-webkit-keyframes pulse {
           0% {
